@@ -4,18 +4,22 @@ import {
   BarChart3,
   CalendarDays,
   ChevronRight,
+  CloudOff,
   Download,
   Heart,
+  LogOut,
   Luggage,
   MessageCircleQuestion,
   Scissors,
   Upload,
+  UserRound,
   WashingMachine,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import { PageHeader } from '@/components/PageHeader';
+import { SyncStatus } from '@/components/SyncStatus';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { SectionHeader } from '@/components/ui/Feedback';
@@ -28,6 +32,8 @@ import { clearAll, estimateUsage } from '@/db';
 import { aiConfigured } from '@/lib/ai';
 import { BACKUP_STALE_DAYS, daysSinceBackup, importBackup, runBackup } from '@/lib/backup';
 import { persistenceState, type PersistenceState } from '@/lib/persistence';
+import { firebaseReady } from '@/sync/firebase';
+import { useAuth } from '@/store/auth';
 import { COLOR_NAMES, swatches } from '@/lib/palette';
 import { titleCase, pluralize } from '@/lib/format';
 import { useCloset } from '@/store/closet';
@@ -49,6 +55,7 @@ export default function ProfilePage() {
   const { items, addItems } = useCloset();
   const outfits = useOutfits((state) => state.outfits);
   const { preferences, update, setTheme } = usePreferences();
+  const { status: authStatus, email: accountEmail, leave } = useAuth();
 
   const [usage, setUsage] = useState<{ usage: number; quota: number } | null>(null);
   const [persisted, setPersisted] = useState<PersistenceState>('unknown');
@@ -87,6 +94,68 @@ export default function ProfilePage() {
       />
 
       <div className="space-y-7 px-5">
+        <section>
+          <SectionHeader title="Account" />
+          {authStatus === 'signed-in' ? (
+            <div className="space-y-3">
+              <SyncStatus />
+              <div className="card flex items-center gap-3 p-4">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--surface-alt)] text-[var(--text-muted)]">
+                  <UserRound size={17} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[0.9375rem] font-medium">
+                    {accountEmail}
+                  </span>
+                  <span className="block text-[0.8125rem] text-[var(--text-muted)]">
+                    Signed in on this device
+                  </span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<LogOut size={15} />}
+                  onClick={async () => {
+                    await leave();
+                    toast('Signed out — your wardrobe stays on this device');
+                  }}
+                >
+                  Sign out
+                </Button>
+              </div>
+            </div>
+          ) : firebaseReady() ? (
+            <Link href="/account" className="card pressable flex items-center gap-3 p-4">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
+                <UserRound size={19} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.9375rem] font-medium">
+                  Sign in to back up your wardrobe
+                </span>
+                <span className="block text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
+                  Right now it lives only on this device. An account means a lost phone is not a
+                  fresh start.
+                </span>
+              </span>
+              <ChevronRight size={17} className="shrink-0 text-[var(--text-faint)]" />
+            </Link>
+          ) : (
+            <div className="card flex items-start gap-3 p-4">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--surface-alt)] text-[var(--text-muted)]">
+                <CloudOff size={17} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.9375rem] font-medium">No backend configured</span>
+                <span className="mt-0.5 block text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
+                  Accounts need a Firebase project. Until then the export below is the only copy
+                  that survives this browser.
+                </span>
+              </span>
+            </div>
+          )}
+        </section>
+
         <nav className="card divide-y divide-[var(--border)]">
           {LINKS.map((link) => {
             const Icon = link.icon;

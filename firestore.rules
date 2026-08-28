@@ -1,0 +1,36 @@
+rules_version = '2';
+
+/*
+ * A wardrobe is readable and writable by exactly one person: the signed-in
+ * owner. Everything lives under /wardrobes/{userId}, and the only rule that
+ * matters is that {userId} must equal the caller's own uid.
+ *
+ * Deny by default: anything not matched below is refused, so a collection added
+ * later is locked until a rule is written for it on purpose.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /wardrobes/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // Clothing, outfits, wear history, plans, packing lists, wishlist.
+      match /records/{recordId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Deletion tombstones, so a delete survives a round trip.
+      match /deletions/{deletionId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

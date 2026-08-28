@@ -33,6 +33,10 @@ interface OutfitState {
   wearOutfit: (id: string, options?: { date?: string; note?: string }) => Promise<void>;
   wearItems: (itemIds: string[], options?: { date?: string; occasion?: string }) => Promise<void>;
   deleteWearLog: (id: string) => Promise<void>;
+  /** Undo a logged wear completely — the log, the counts and the laundry. */
+  undoWear: (logId: string) => Promise<void>;
+  /** What was worn on a given day, most recent first. */
+  wornOn: (date: string) => WearLog[];
   byId: (id: string) => Outfit | undefined;
 }
 
@@ -113,6 +117,7 @@ export const useOutfits = create<OutfitState>((set, get) => ({
     const outfit = get().outfits.find((entry) => entry.id === id);
     if (!outfit) return;
     const date = options?.date ?? todayKey();
+    const stamp = nowIso();
     const log: WearLog = {
       id: createId('wear'),
       outfitId: outfit.id,
@@ -120,7 +125,8 @@ export const useOutfits = create<OutfitState>((set, get) => ({
       date,
       occasion: outfit.occasion,
       note: options?.note,
-      createdAt: nowIso(),
+      createdAt: stamp,
+      updatedAt: stamp,
     };
     await put('wearLogs', log);
     await get().updateOutfit(id, { timesWorn: outfit.timesWorn + 1, lastWornAt: nowIso() });
@@ -130,12 +136,14 @@ export const useOutfits = create<OutfitState>((set, get) => ({
 
   wearItems: async (itemIds, options) => {
     if (!itemIds.length) return;
+    const stamp = nowIso();
     const log: WearLog = {
       id: createId('wear'),
       itemIds: [...itemIds],
       date: options?.date ?? todayKey(),
       occasion: options?.occasion,
-      createdAt: nowIso(),
+      createdAt: stamp,
+      updatedAt: stamp,
     };
     await put('wearLogs', log);
     await useCloset.getState().markWorn(itemIds);
@@ -146,6 +154,25 @@ export const useOutfits = create<OutfitState>((set, get) => ({
     await remove('wearLogs', id);
     set((state) => ({ wearLogs: state.wearLogs.filter((log) => log.id !== id) }));
   },
+
+  undoWear: async (logId) => {
+    const log = get().wearLogs.find((entry) => entry.id === logId);
+    if (!log) return;
+
+    if (log.outfitId) {
+      const outfit = get().outfits.find((entry) => entry.id === log.outfitId);
+      if (outfit) {
+        await get().updateOutfit(outfit.id, {
+          timesWorn: Math.max(0, outfit.timesWorn - 1),
+        });
+      }
+    }
+    await useCloset.getState().undoWorn(log.itemIds);
+    await remove('wearLogs', logId);
+    set((state) => ({ wearLogs: state.wearLogs.filter((entry) => entry.id !== logId) }));
+  },
+
+  wornOn: (date) => get().wearLogs.filter((log) => log.date === date),
 
   byId: (id) => get().outfits.find((outfit) => outfit.id === id),
 }));

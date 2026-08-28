@@ -9,7 +9,9 @@ import { Button, ButtonLink } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { cn } from '@/lib/cn';
+import { formatTemperatureLong } from '@/lib/format';
 import { useActiveItems, useResolvedItems } from '@/store/closet';
+import { usePreferences } from '@/store/preferences';
 import { useStylist } from '@/store/stylist';
 import { useWeather } from '@/store/weather';
 import type { StylistMessage } from '@/types';
@@ -26,6 +28,7 @@ export default function StylistPage() {
   const items = useActiveItems();
   const { thread, pending, ask, clear } = useStylist();
   const weather = useWeather((state) => state.snapshot);
+  const units = usePreferences((state) => state.preferences.units);
   const [draft, setDraft] = useState('');
   const bottom = useRef<HTMLDivElement>(null);
 
@@ -39,7 +42,9 @@ export default function StylistPage() {
     void ask(
       question,
       items,
-      weather ? `${Math.round(weather.temperature)}°C, ${weather.condition}` : undefined,
+      weather
+        ? `${formatTemperatureLong(weather.temperature, units)}, ${weather.condition}`
+        : undefined,
     );
   }
 

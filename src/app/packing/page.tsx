@@ -11,10 +11,11 @@ import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { Field, Input } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
 import { planPacking } from '@/lib/ai';
-import { pluralize } from '@/lib/format';
+import { formatTemperatureRange, pluralize } from '@/lib/format';
 import { formatRelative } from '@/lib/date';
 import { useActiveItems } from '@/store/closet';
 import { usePlanner } from '@/store/planner';
+import { usePreferences } from '@/store/preferences';
 import { toast } from '@/store/toast';
 import { useWeather } from '@/store/weather';
 
@@ -34,6 +35,7 @@ export default function PackingPage() {
   const items = useActiveItems();
   const { packingLists, savePackingList } = usePlanner();
   const weather = useWeather((state) => state.snapshot);
+  const preferences = usePreferences((state) => state.preferences);
 
   const [open, setOpen] = useState(false);
   const [destination, setDestination] = useState('');
@@ -53,7 +55,7 @@ export default function PackingPage() {
         startDate: startDate || undefined,
         activities,
         weatherSummary: weather
-          ? `${Math.round(weather.low)}–${Math.round(weather.high)}°C, ${weather.condition}`
+          ? `${formatTemperatureRange(weather.low, weather.high, preferences.units)}, ${weather.condition}`
           : undefined,
       },
       items,

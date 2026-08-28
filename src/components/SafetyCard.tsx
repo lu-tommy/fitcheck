@@ -18,6 +18,7 @@ import {
   type Platform,
 } from '@/lib/persistence';
 import { pluralize } from '@/lib/format';
+import { useAuth } from '@/store/auth';
 import { useCloset } from '@/store/closet';
 import { usePreferences } from '@/store/preferences';
 import { toast } from '@/store/toast';
@@ -31,6 +32,7 @@ import { toast } from '@/store/toast';
  */
 export function SafetyCard() {
   const items = useCloset((state) => state.items);
+  const signedIn = useAuth((state) => state.status === 'signed-in');
   const { preferences, update } = usePreferences();
   const [standalone, setStandalone] = useState(true);
   const [promptable, setPromptable] = useState(false);
@@ -48,7 +50,10 @@ export function SafetyCard() {
 
   const showInstall = !standalone && !preferences.installPromptDismissed;
   const age = daysSinceBackup(preferences.lastBackupAt);
-  const backupOverdue = age === null ? items.length >= 12 : age >= BACKUP_STALE_DAYS;
+  // With an account, the wardrobe is already copied off the device; nagging for
+  // a manual export on top of that is noise.
+  const backupOverdue =
+    !signedIn && (age === null ? items.length >= 12 : age >= BACKUP_STALE_DAYS);
 
   if (showInstall) {
     return (

@@ -24,9 +24,9 @@ const outfits: Outfit[] = [
 ];
 
 const wearLogs: WearLog[] = [
-  { id: 'w1', outfitId: 'o1', itemIds: ['a', 'c'], date: '2026-02-01', createdAt: '' },
-  { id: 'w2', outfitId: 'o1', itemIds: ['a'], date: '2026-02-01', createdAt: '' },
-  { id: 'w3', outfitId: 'o1', itemIds: ['c'], date: '2026-02-02', createdAt: '' },
+  { id: 'w1', outfitId: 'o1', itemIds: ['a', 'c'], date: '2026-02-01', createdAt: '', updatedAt: '' },
+  { id: 'w2', outfitId: 'o1', itemIds: ['a'], date: '2026-02-01', createdAt: '', updatedAt: '' },
+  { id: 'w3', outfitId: 'o1', itemIds: ['c'], date: '2026-02-02', createdAt: '', updatedAt: '' },
 ];
 
 describe('computeStats', () => {

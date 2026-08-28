@@ -7,6 +7,9 @@ import { useEffect, type ReactNode } from 'react';
 
 import { cn } from '@/lib/cn';
 import { registerServiceWorker, requestPersistence } from '@/lib/persistence';
+import { startSyncSchedule } from '@/sync/schedule';
+import { useAuth } from '@/store/auth';
+import { useSync, watchForExternalChanges } from '@/store/sync';
 import { Toaster } from '@/components/ui/Toaster';
 import { useCloset } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
@@ -30,6 +33,7 @@ const IMMERSIVE = ['/add'];
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const immersive = IMMERSIVE.some((route) => pathname.startsWith(route));
+  const userId = useAuth((state) => state.userId);
 
   // One hydration pass for the whole app. Each store guards against a second
   // run, so mounting this once at the root is enough.
@@ -46,7 +50,25 @@ export function AppShell({ children }: { children: ReactNode }) {
     void useWishlist.getState().hydrate();
     void useStylist.getState().hydrate();
     void useWeather.getState().hydrate();
+    useAuth.getState().watch();
+
+    /*
+     * A second tab writing to the same database must not leave this one showing
+     * a stale wardrobe — and that is true signed out as much as signed in, so
+     * it lives here rather than inside the sync schedule.
+     */
+    return watchForExternalChanges();
   }, []);
+
+  // Sync only runs for a signed-in account; signed out, the app is exactly the
+  // local-first app it was before, which is what keeps it usable on day one.
+  useEffect(() => {
+    if (!userId) {
+      useSync.getState().reset();
+      return;
+    }
+    return startSyncSchedule(userId);
+  }, [userId]);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">

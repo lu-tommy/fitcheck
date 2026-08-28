@@ -266,6 +266,7 @@ export interface WearLog {
   occasion?: string;
   note?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface CalendarEntry {
@@ -275,6 +276,7 @@ export interface CalendarEntry {
   outfitId: string;
   label?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface PackingDayPlan {
@@ -295,6 +297,7 @@ export interface PackingList {
   notes?: string;
   packedItemIds: string[];
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface WishlistItem {
@@ -311,6 +314,7 @@ export interface WishlistItem {
   source: 'ai' | 'manual';
   purchased: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -421,4 +425,39 @@ export interface PackingRequest {
   startDate?: string;
   activities: string[];
   weatherSummary?: string;
+}
+
+
+/* ------------------------------------------------------------------ sync -- */
+
+/** The collections that synchronise. Photos and settings travel separately. */
+export type SyncedStore = 'items' | 'outfits' | 'wearLogs' | 'calendar' | 'packing' | 'wishlist';
+
+/**
+ * A record of something being deleted.
+ *
+ * Without these a delete is invisible to sync: the other device still holds the
+ * record, pushes it back, and the deleted item reappears. Tombstones are the
+ * only way a deletion survives a round trip.
+ */
+export interface Tombstone {
+  /** `${store}:${recordId}` — unique across every collection. */
+  id: string;
+  store: SyncedStore;
+  recordId: string;
+  deletedAt: string;
+}
+
+/** Everything the sync engine remembers between runs. */
+export interface SyncState {
+  /** Firestore document path prefix — the signed-in user. */
+  userId?: string;
+  /** Highest local updatedAt already pushed. */
+  lastPushedAt?: string;
+  /** Newest server stamp already pulled, as milliseconds since the epoch. */
+  lastPulledAt?: number;
+  lastSyncedAt?: string;
+  lastError?: string;
+  /** Photo ids known to exist in cloud storage, so uploads are not repeated. */
+  uploadedPhotoIds: string[];
 }

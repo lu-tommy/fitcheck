@@ -11,7 +11,9 @@ interface WishlistState {
   items: WishlistItem[];
   hydrated: boolean;
   hydrate: () => Promise<void>;
-  add: (draft: Omit<WishlistItem, 'id' | 'createdAt' | 'purchased'>) => Promise<WishlistItem>;
+  add: (
+    draft: Omit<WishlistItem, 'id' | 'createdAt' | 'updatedAt' | 'purchased'>,
+  ) => Promise<WishlistItem>;
   update: (id: string, patch: Partial<WishlistItem>) => Promise<void>;
   togglePurchased: (id: string) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
@@ -29,11 +31,13 @@ export const useWishlist = create<WishlistState>((set, get) => ({
   },
 
   add: async (draft) => {
+    const stamp = nowIso();
     const item: WishlistItem = {
       ...draft,
       id: createId('wish'),
       purchased: false,
-      createdAt: nowIso(),
+      createdAt: stamp,
+      updatedAt: stamp,
     };
     await put('wishlist', item);
     set((state) => ({ items: [item, ...state.items] }));
@@ -43,7 +47,7 @@ export const useWishlist = create<WishlistState>((set, get) => ({
   update: async (id, patch) => {
     const current = get().items.find((item) => item.id === id);
     if (!current) return;
-    const next = { ...current, ...patch, id };
+    const next = { ...current, ...patch, id, updatedAt: nowIso() };
     await put('wishlist', next);
     set((state) => ({ items: state.items.map((item) => (item.id === id ? next : item)) }));
   },

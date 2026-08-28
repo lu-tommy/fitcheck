@@ -1,12 +1,22 @@
 'use client';
 
-import { Camera, MessageCircleQuestion, Shirt, Sparkles, WashingMachine } from 'lucide-react';
+import {
+  Camera,
+  Check,
+  MessageCircleQuestion,
+  Shirt,
+  Sparkles,
+  Undo2,
+  WashingMachine,
+} from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 import { OutfitPill } from '@/components/outfit/OutfitCard';
 import { MemoryCard } from '@/components/MemoryCard';
 import { SafetyCard } from '@/components/SafetyCard';
+import { OutfitCollage } from '@/components/outfit/OutfitCollage';
 import { OutfitStack } from '@/components/outfit/OutfitStack';
 import { WeatherCard } from '@/components/WeatherCard';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -24,9 +34,10 @@ import { useWeather } from '@/store/weather';
 import type { Outfit } from '@/types';
 
 export default function HomePage() {
+  const router = useRouter();
   const { hydrated, addItems } = useCloset();
   const items = useActiveItems();
-  const { outfits, wearLogs, saveOutfit, wearOutfit } = useOutfits();
+  const { outfits, wearLogs, saveOutfit, wearOutfit, undoWear } = useOutfits();
   const entryFor = usePlanner((state) => state.entryFor);
   const preferences = usePreferences((state) => state.preferences);
   const weather = useWeather((state) => state.snapshot);
@@ -36,13 +47,22 @@ export default function HomePage() {
   const planned = entryFor(today);
   const plannedOutfit = outfits.find((outfit) => outfit.id === planned?.outfitId);
 
+  /*
+   * Today has three states, and they are the whole shape of this screen: worn
+   * already, planned but not yet worn, or open. Tapping "wear this" used to
+   * silently regenerate the suggestion, which read as the app overruling you.
+   * Now it settles the day.
+   */
+  const wornToday = wearLogs.find((log) => log.date === today) ?? null;
+  const wornOutfit = outfits.find((outfit) => outfit.id === wornToday?.outfitId) ?? null;
+
   /**
    * The home suggestion always comes from the on-device engine, even when a
    * key is configured. Opening the app should not spend money, and the picker
    * on the Generate screen is where a considered suggestion belongs.
    */
   const suggestion = useMemo(() => {
-    if (items.length < 3 || plannedOutfit) return null;
+    if (items.length < 3 || plannedOutfit || wornToday) return null;
     return buildOutfitLocally({
       request: {
         prompt: 'Something for today',
@@ -54,11 +74,24 @@ export default function HomePage() {
       weather,
       preferredStyles: preferences.preferredStyles,
       avoidColors: preferences.avoidColors,
+      units: preferences.units,
     });
-  }, [items, weather, preferences.preferredStyles, preferences.avoidColors, plannedOutfit]);
+  }, [
+    items,
+    weather,
+    preferences.preferredStyles,
+    preferences.avoidColors,
+    preferences.units,
+    plannedOutfit,
+    wornToday,
+  ]);
 
   const suggestionItems = useResolvedItems(suggestion?.itemIds);
   const plannedItems = useResolvedItems(plannedOutfit?.itemIds);
+  const wornItems = useResolvedItems(wornToday?.itemIds);
+  // Shoes, outerwear and accessories survive a wear, so "logged" and "in the
+  // wash" are different numbers and the card should not conflate them.
+  const wornInTheWash = wornItems.filter((item) => item.laundry !== 'clean').length;
 
   const recentlyWorn = useMemo(() => {
     const seen = new Set<string>();
@@ -90,7 +123,7 @@ export default function HomePage() {
       occasion: 'Today',
     });
     await wearOutfit(outfit.id);
-    toast('Saved and logged as worn today', { tone: 'success' });
+    toast('That is today sorted', { tone: 'success' });
   }
 
   return (
@@ -127,6 +160,58 @@ export default function HomePage() {
               }
             />
           </section>
+        ) : wornToday ? (
+          <section>
+            <SectionHeader
+              title="Today"
+              action={
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await undoWear(wornToday.id);
+                    toast('Undone — today is open again');
+                  }}
+                  className="pressable inline-flex items-center gap-1.5 text-[0.8125rem] text-[var(--text-muted)]"
+                >
+                  <Undo2 size={14} />
+                  Undo
+                </button>
+              }
+            />
+            <div className="card overflow-hidden">
+              <div className="flex items-center gap-2.5 border-b border-[var(--border)] bg-[var(--success-soft)] px-4 py-2.5">
+                <Check size={16} className="shrink-0 text-[var(--success)]" />
+                <p className="text-[0.875rem] font-medium text-[var(--success)]">
+                  {wornOutfit ? `Wearing ${wornOutfit.name.toLowerCase()}` : 'Wearing this today'}
+                </p>
+              </div>
+              <div className="p-4">
+                <OutfitCollage
+                  items={wornItems}
+                  layout={wornOutfit?.layout}
+                  onSelect={(item) => router.push(`/closet/${item.id}`)}
+                />
+                <p className="mt-3 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
+                  {pluralize(wornItems.length, 'piece')} logged.{' '}
+                  {wornInTheWash
+                    ? `${wornInTheWash} went in the wash, so ${
+                        wornInTheWash === 1 ? 'it will' : 'they will'
+                      } not be suggested again tomorrow.`
+                    : 'Nothing here needs washing after one wear.'}
+                </p>
+                <div className="mt-3 flex gap-2">
+                  {wornOutfit ? (
+                    <ButtonLink href={`/outfits/${wornOutfit.id}`} variant="secondary" full>
+                      Open outfit
+                    </ButtonLink>
+                  ) : null}
+                  <ButtonLink href="/generate" variant="secondary" full>
+                    Change your mind
+                  </ButtonLink>
+                </div>
+              </div>
+            </div>
+          </section>
         ) : plannedOutfit ? (
           <section>
             <SectionHeader
@@ -143,9 +228,10 @@ export default function HomePage() {
               <Button
                 full
                 className="mt-3"
-                onClick={() => {
-                  void wearOutfit(plannedOutfit.id);
-                  toast('Logged as worn today', { tone: 'success' });
+                icon={<Check size={17} />}
+                onClick={async () => {
+                  await wearOutfit(plannedOutfit.id);
+                  toast('That is today sorted', { tone: 'success' });
                 }}
               >
                 Wear this today
@@ -168,7 +254,7 @@ export default function HomePage() {
                 {suggestion.explanation}
               </p>
               <div className="mt-3 flex gap-2">
-                <Button full onClick={saveSuggestion}>
+                <Button full icon={<Check size={17} />} onClick={saveSuggestion}>
                   Wear this
                 </Button>
                 <ButtonLink href="/generate" variant="secondary" full>

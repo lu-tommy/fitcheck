@@ -2,12 +2,53 @@
 
 import { openDB, type IDBPDatabase } from 'idb';
 
+import { nowIso } from '@/lib/date';
+import type { SyncedStore, Tombstone } from '@/types';
+
+import { DB_VERSION, runMigrations } from './migrations';
 import type { OutfitAIDB, MetaShapes, StoredPhoto } from './schema';
 
 const DB_NAME = 'outfitai';
-const DB_VERSION = 1;
 
 let dbPromise: Promise<IDBPDatabase<OutfitAIDB>> | null = null;
+
+/** Broadcast so a second tab does not keep showing a stale wardrobe. */
+const CHANNEL = 'outfitai:changes';
+/**
+ * A BroadcastChannel does not hear its own posts, but a second channel object
+ * in the same tab does — so messages carry the tab that sent them and a
+ * listener ignores its own. Without this every local write would trigger a full
+ * re-read in the tab that made it.
+ */
+const TAB_ID = Math.random().toString(36).slice(2);
+let channel: BroadcastChannel | null = null;
+
+function broadcast(): void {
+  if (typeof BroadcastChannel === 'undefined') return;
+  if (!channel) channel = new BroadcastChannel(CHANNEL);
+  channel.postMessage({ tab: TAB_ID, at: Date.now() });
+}
+
+/** Run `handler` when another tab changes the data. Never fires for own writes. */
+export function onExternalChange(handler: () => void): () => void {
+  if (typeof BroadcastChannel === 'undefined') return () => {};
+  const listener = new BroadcastChannel(CHANNEL);
+  listener.onmessage = (event: MessageEvent<{ tab?: string }>) => {
+    if (event.data?.tab === TAB_ID) return;
+    handler();
+  };
+  return () => listener.close();
+}
+
+/** Run `handler` after any local write, so sync can be scheduled. */
+export function onLocalWrite(handler: () => void): () => void {
+  if (typeof BroadcastChannel === 'undefined') return () => {};
+  const listener = new BroadcastChannel(CHANNEL);
+  listener.onmessage = (event: MessageEvent<{ tab?: string }>) => {
+    if (event.data?.tab === TAB_ID) handler();
+  };
+  return () => listener.close();
+}
 
 /**
  * IndexedDB does not exist during SSR or prerender, so every caller goes
@@ -19,34 +60,26 @@ export function db(): Promise<IDBPDatabase<OutfitAIDB>> {
   }
   if (!dbPromise) {
     dbPromise = openDB<OutfitAIDB>(DB_NAME, DB_VERSION, {
-      upgrade(database, oldVersion) {
-        if (oldVersion < 1) {
-          const items = database.createObjectStore('items', { keyPath: 'id' });
-          items.createIndex('createdAt', 'createdAt');
-          items.createIndex('category', 'category');
-
-          const outfits = database.createObjectStore('outfits', { keyPath: 'id' });
-          outfits.createIndex('createdAt', 'createdAt');
-
-          const wearLogs = database.createObjectStore('wearLogs', { keyPath: 'id' });
-          wearLogs.createIndex('date', 'date');
-
-          const calendar = database.createObjectStore('calendar', { keyPath: 'id' });
-          calendar.createIndex('date', 'date');
-
-          const packing = database.createObjectStore('packing', { keyPath: 'id' });
-          packing.createIndex('createdAt', 'createdAt');
-
-          const wishlist = database.createObjectStore('wishlist', { keyPath: 'id' });
-          wishlist.createIndex('createdAt', 'createdAt');
-
-          database.createObjectStore('photos', { keyPath: 'id' });
-          database.createObjectStore('meta', { keyPath: 'key' });
-        }
+      async upgrade(database, oldVersion, _newVersion, transaction) {
+        await runMigrations(database, transaction, oldVersion);
       },
       blocked() {
         console.warn('[outfitai] another tab is holding an older database version open');
       },
+      blocking() {
+        // Another tab wants to upgrade. Let go rather than deadlock it: the
+        // next call reopens at the new version.
+        void dbPromise?.then((database) => database.close());
+        dbPromise = null;
+      },
+      terminated() {
+        // The browser dropped the connection (memory pressure, a crashed tab).
+        // Forget it so the next call reconnects instead of failing forever.
+        dbPromise = null;
+      },
+    }).catch((error) => {
+      dbPromise = null;
+      throw error;
     });
   }
   return dbPromise;
@@ -67,20 +100,70 @@ export async function put<K extends CollectionName>(
 ): Promise<void> {
   const database = await db();
   await database.put(store, value);
+  broadcast();
 }
 
 export async function putMany<K extends CollectionName>(
   store: K,
   values: OutfitAIDB[K]['value'][],
 ): Promise<void> {
+  if (!values.length) return;
   const database = await db();
   const tx = database.transaction(store, 'readwrite');
   await Promise.all([...values.map((value) => tx.store.put(value)), tx.done]);
+  broadcast();
 }
 
+/**
+ * Delete a record and leave a tombstone.
+ *
+ * The tombstone is what makes the deletion survive a sync: without it the other
+ * device still holds the record, pushes it back, and the thing reappears.
+ */
 export async function remove(store: CollectionName, id: string): Promise<void> {
   const database = await db();
+  const tx = database.transaction([store, 'deletions'], 'readwrite');
+  const tombstone: Tombstone = {
+    id: `${store}:${id}`,
+    store: store as SyncedStore,
+    recordId: id,
+    deletedAt: nowIso(),
+  };
+  await Promise.all([
+    tx.objectStore(store).delete(id),
+    tx.objectStore('deletions').put(tombstone),
+    tx.done,
+  ]);
+  broadcast();
+}
+
+/** Apply a remote deletion without recording a fresh tombstone for it. */
+export async function removeSilently(store: CollectionName, id: string): Promise<void> {
+  const database = await db();
   await database.delete(store, id);
+}
+
+export async function readTombstones(): Promise<Tombstone[]> {
+  const database = await db();
+  return database.getAll('deletions');
+}
+
+export async function putTombstone(tombstone: Tombstone): Promise<void> {
+  const database = await db();
+  await database.put('deletions', tombstone);
+}
+
+/** Tombstones older than the horizon are no longer needed by any device. */
+export async function pruneTombstones(olderThanDays = 120): Promise<number> {
+  const database = await db();
+  const cutoff = new Date(Date.now() - olderThanDays * 86_400_000).toISOString();
+  const stale = (await database.getAll('deletions')).filter(
+    (tombstone) => tombstone.deletedAt < cutoff,
+  );
+  if (!stale.length) return 0;
+  const tx = database.transaction('deletions', 'readwrite');
+  await Promise.all([...stale.map((t) => tx.store.delete(t.id)), tx.done]);
+  return stale.length;
 }
 
 export async function clearAll(): Promise<void> {
@@ -94,6 +177,7 @@ export async function clearAll(): Promise<void> {
     'wishlist',
     'photos',
     'meta',
+    'deletions',
   ] as const;
   const tx = database.transaction(stores, 'readwrite');
   await Promise.all([...stores.map((name) => tx.objectStore(name).clear()), tx.done]);
@@ -120,6 +204,11 @@ export async function writeMeta<K extends keyof MetaShapes>(
 export async function putPhoto(photo: StoredPhoto): Promise<void> {
   const database = await db();
   await database.put('photos', photo);
+}
+
+export async function listPhotoIds(): Promise<string[]> {
+  const database = await db();
+  return database.getAllKeys('photos') as Promise<string[]>;
 }
 
 export async function getPhoto(id: string): Promise<StoredPhoto | undefined> {

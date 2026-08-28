@@ -19,6 +19,7 @@ import {
   todayKey,
 } from '@/lib/date';
 import { cn } from '@/lib/cn';
+import { formatTemperatureRange, pluralize } from '@/lib/format';
 import { planWeek } from '@/domain/weekPlanner';
 import { useActiveItems, useResolvedItems } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
@@ -78,6 +79,7 @@ export default function CalendarPage() {
               weather,
               preferredStyles: preferences.preferredStyles,
               avoidColors: preferences.avoidColors,
+              units: preferences.units,
               dates,
             });
             if (!week.length) {
@@ -92,7 +94,7 @@ export default function CalendarPage() {
                 explanation: day.outfit.explanation,
                 colorNotes: day.outfit.colorNotes,
                 weatherContext: day.forecast
-                  ? `${Math.round(day.forecast.low)}–${Math.round(day.forecast.high)}°C, ${day.forecast.condition}`
+                  ? `${formatTemperatureRange(day.forecast.low, day.forecast.high, preferences.units)}, ${day.forecast.condition}`
                   : undefined,
                 source: 'ai',
               });

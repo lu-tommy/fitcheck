@@ -5,12 +5,14 @@ import type {
   Season,
   Slot,
   Style,
+  Units,
   WeatherSnapshot,
 } from '@/types';
 
 import { analyzeHarmony, hexForColorName } from './color';
 import { categoryMeta, formalityScore, slotOf } from './taxonomy';
 import { currentSeason } from '@/lib/date';
+import { formatTemperatureLong } from '@/lib/format';
 
 /**
  * Rule-based outfit builder.
@@ -36,6 +38,12 @@ export interface EngineContext {
    * it loses is the rule that actually matters — not repeating a top.
    */
   restingItemIds?: string[];
+  /**
+   * How temperatures are written in the explanation. The engine reasons in
+   * Celsius throughout — this only decides what the reader sees, so someone
+   * who set Fahrenheit is never told it is 18 degrees outside.
+   */
+  units?: Units;
 }
 
 interface ScoredItem {
@@ -316,12 +324,13 @@ function localExplanation(
   const layers = chosen.filter((item) =>
     ['midlayer', 'outerwear'].includes(slotOf(item.category)),
   );
+  const reading = formatTemperatureLong(temperature, context.units ?? 'metric');
   const weatherNote =
     neededWarmth === 0
-      ? `At ${Math.round(temperature)}°C the priority is staying cool, so nothing heavy.`
+      ? `At ${reading} the priority is staying cool, so nothing heavy.`
       : layers.length
-        ? `${layers.map((item) => item.name).join(' and ')} covers the ${Math.round(temperature)}°C.`
-        : `Light enough for ${Math.round(temperature)}°C — add a layer if you will be out after dark.`;
+        ? `${layers.map((item) => item.name).join(' and ')} covers the ${reading}.`
+        : `Light enough for ${reading} — add a layer if you will be out after dark.`;
 
   const formalityNote = context.request.formality
     ? ` Pitched at ${context.request.formality.replace('-', ' ')}.`

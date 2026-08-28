@@ -5,6 +5,7 @@ import type {
   DailyForecast,
   GeneratedOutfit,
   Style,
+  Units,
   WeatherSnapshot,
 } from '@/types';
 
@@ -32,6 +33,7 @@ export interface WeekPlanContext {
   avoidColors?: string[];
   /** Dates to plan, in order. */
   dates: string[];
+  units?: Units;
 }
 
 /** How many days a piece is discouraged from reappearing. */
@@ -72,6 +74,7 @@ export function planWeek(context: WeekPlanContext): PlannedDay[] {
       preferredStyles: context.preferredStyles,
       avoidColors: context.avoidColors,
       restingItemIds: resting,
+      units: context.units,
     });
 
     outfit.itemIds.forEach((itemId) => lastUsed.set(itemId, index));

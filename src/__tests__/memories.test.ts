@@ -16,6 +16,7 @@ const iso = (offsetDays: number) =>
 const log = (overrides: Partial<WearLog> & { date: string; itemIds: string[] }): WearLog => ({
   id: `log-${overrides.date}-${overrides.itemIds.join('')}`,
   createdAt: iso(0),
+  updatedAt: iso(0),
   ...overrides,
 });
 

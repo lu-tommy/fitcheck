@@ -26,7 +26,7 @@ import {
 import { generateOutfit, type AiSource } from '@/lib/ai';
 import { renderComparisonImage, shareImage } from '@/lib/outfitImage';
 import { COLOR_NAMES, swatches } from '@/lib/palette';
-import { titleCase } from '@/lib/format';
+import { formatTemperatureLong, titleCase } from '@/lib/format';
 import { useActiveItems, useCloset, useResolvedItems } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
 import { usePreferences } from '@/store/preferences';
@@ -106,6 +106,7 @@ function Generator() {
       weather,
       preferredStyles: preferences.preferredStyles,
       avoidColors: preferences.avoidColors,
+      units: preferences.units,
     });
     setResult(generated);
     setRival(null);
@@ -138,6 +139,7 @@ function Generator() {
       weather,
       preferredStyles: preferences.preferredStyles,
       avoidColors: preferences.avoidColors,
+      units: preferences.units,
     });
     setBusy(false);
     if (generated.outfit.itemIds.length < 2) {
@@ -175,7 +177,7 @@ function Generator() {
     const outfit = await saveGenerated(result.outfit, {
       occasion,
       weatherContext: weather
-        ? `${Math.round(weather.temperature)}°C, ${weather.condition}`
+        ? `${formatTemperatureLong(weather.temperature, preferences.units)}, ${weather.condition}`
         : undefined,
     });
     if (alsoWear) await wearOutfit(outfit.id);
@@ -491,7 +493,8 @@ function Generator() {
 
         {weather ? (
           <p className="text-center text-[0.8125rem] text-[var(--text-muted)]">
-            Using today&rsquo;s forecast: {Math.round(weather.temperature)}°C,{' '}
+            Using today&rsquo;s forecast:{' '}
+            {formatTemperatureLong(weather.temperature, preferences.units)},{' '}
             {weather.condition.toLowerCase()} in {weather.locationLabel}.
           </p>
         ) : null}

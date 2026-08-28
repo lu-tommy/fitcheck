@@ -29,6 +29,8 @@ interface ClosetState {
   setArchived: (id: string, archived: boolean) => Promise<void>;
   /** Called when an outfit is worn: bumps counts and dirties everything in it. */
   markWorn: (itemIds: string[]) => Promise<void>;
+  /** Reverse a wear that was logged by mistake. */
+  undoWorn: (itemIds: string[]) => Promise<void>;
   washAll: () => Promise<void>;
   byId: (id: string) => ClothingItem | undefined;
   resolve: (ids: string[]) => ClothingItem[];
@@ -130,6 +132,33 @@ export const useCloset = create<ClosetState>((set, get) => ({
     if (!updated.length) return;
     await putMany('items', updated);
     const patch = new Map(updated.map((item) => [item.id, item]));
+    set((state) => ({ items: state.items.map((item) => patch.get(item.id) ?? item) }));
+  },
+
+  /**
+   * Undo a wear.
+   *
+   * Deliberately conservative: the count comes back down and anything this
+   * would have dirtied goes back to clean, but a piece already in the wash for
+   * another reason is left alone. `lastWornAt` is not restored — there is no
+   * record of what it was before, and a wrong date is worse than a stale one.
+   */
+  undoWorn: async (itemIds) => {
+    const stamp = nowIso();
+    const affected = get()
+      .items.filter((item) => itemIds.includes(item.id))
+      .map((item) => ({
+        ...item,
+        wearCount: Math.max(0, item.wearCount - 1),
+        laundry:
+          needsWashing(item) && item.laundry === 'dirty'
+            ? ('clean' as LaundryStatus)
+            : item.laundry,
+        updatedAt: stamp,
+      }));
+    if (!affected.length) return;
+    await putMany('items', affected);
+    const patch = new Map(affected.map((item) => [item.id, item]));
     set((state) => ({ items: state.items.map((item) => patch.get(item.id) ?? item) }));
   },
 

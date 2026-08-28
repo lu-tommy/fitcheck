@@ -9,8 +9,22 @@ export function titleCase(value: string): string {
 }
 
 export function formatTemperature(celsius: number, units: Units): string {
-  const value = units === 'imperial' ? celsius * (9 / 5) + 32 : celsius;
-  return `${Math.round(value)}°`;
+  return `${Math.round(toDisplayTemperature(celsius, units))}°`;
+}
+
+/** Everything is stored in Celsius; only the display ever changes. */
+export function toDisplayTemperature(celsius: number, units: Units): number {
+  return units === 'imperial' ? celsius * (9 / 5) + 32 : celsius;
+}
+
+/** With the unit spelled out — for prose, where a bare degree sign is ambiguous. */
+export function formatTemperatureLong(celsius: number, units: Units): string {
+  return `${Math.round(toDisplayTemperature(celsius, units))}${temperatureUnitLabel(units)}`;
+}
+
+/** A low-to-high range, with the unit named once. */
+export function formatTemperatureRange(low: number, high: number, units: Units): string {
+  return `${Math.round(toDisplayTemperature(low, units))}–${formatTemperatureLong(high, units)}`;
 }
 
 export function temperatureUnitLabel(units: Units): string {

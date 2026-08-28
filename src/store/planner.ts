@@ -16,7 +16,9 @@ interface PlannerState {
   assign: (date: string, outfitId: string, label?: string) => Promise<void>;
   unassign: (date: string) => Promise<void>;
   entryFor: (date: string) => CalendarEntry | undefined;
-  savePackingList: (list: Omit<PackingList, 'id' | 'createdAt' | 'packedItemIds'>) => Promise<PackingList>;
+  savePackingList: (
+    list: Omit<PackingList, 'id' | 'createdAt' | 'updatedAt' | 'packedItemIds'>,
+  ) => Promise<PackingList>;
   togglePacked: (listId: string, itemId: string) => Promise<void>;
   deletePackingList: (id: string) => Promise<void>;
   packingById: (id: string) => PackingList | undefined;
@@ -37,12 +39,14 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   assign: async (date, outfitId, label) => {
     const existing = get().calendar.find((entry) => entry.date === date);
     if (existing) await remove('calendar', existing.id);
+    const stamp = nowIso();
     const entry: CalendarEntry = {
       id: createId('cal'),
       date,
       outfitId,
       label,
-      createdAt: nowIso(),
+      createdAt: stamp,
+      updatedAt: stamp,
     };
     await put('calendar', entry);
     set((state) => ({
@@ -60,11 +64,13 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   entryFor: (date) => get().calendar.find((entry) => entry.date === date),
 
   savePackingList: async (draft) => {
+    const stamp = nowIso();
     const list: PackingList = {
       ...draft,
       id: createId('pack'),
       packedItemIds: [],
-      createdAt: nowIso(),
+      createdAt: stamp,
+      updatedAt: stamp,
     };
     await put('packing', list);
     set((state) => ({ packingLists: [list, ...state.packingLists] }));
@@ -77,7 +83,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     const packed = list.packedItemIds.includes(itemId)
       ? list.packedItemIds.filter((id) => id !== itemId)
       : [...list.packedItemIds, itemId];
-    const next = { ...list, packedItemIds: packed };
+    const next = { ...list, packedItemIds: packed, updatedAt: nowIso() };
     await put('packing', next);
     set((state) => ({
       packingLists: state.packingLists.map((entry) => (entry.id === listId ? next : entry)),

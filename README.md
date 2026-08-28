@@ -48,10 +48,55 @@ screen is where a considered suggestion belongs.
 
 ---
 
+## Accounts and backup
+
+Sign in and the wardrobe is copied to your own Firebase project — a lost phone
+stops being a fresh start, and the same account works on a phone and a tablet.
+**The app works fully without one**, signed out and offline; an account is
+additive, not a wall in front of the door.
+
+Setup is about ten minutes and the steps are in `.env.example`. In short: create
+a Firebase project, enable Email/Password sign-in, create Firestore and Storage,
+paste the web config into `.env.local`, then
+`firebase deploy --only firestore:rules,storage`.
+
+**Deploy the rules.** `firestore.rules` and `storage.rules` are what make a
+wardrobe private: they allow a signed-in user to read and write nothing but
+documents under their own uid, and deny everything else by default. The Firebase
+web config in `.env.local` is not a secret — it is public by design — so the
+rules are the whole of the security model.
+
+### How sync behaves
+
+The local database stays the source of truth, so every screen reads IndexedDB
+and the app is instant with or without a connection. The engine reconciles that
+copy with the server after a change, when the app comes back to the foreground,
+when the connection returns, and on a slow heartbeat.
+
+Three properties it holds, because losing someone's clothes is not a recoverable
+error:
+
+- **It never removes local data** except when a strictly newer deletion says to.
+- **It is safe to interrupt.** There is no two-phase commit anywhere; incoming
+  records are written before anything is removed, and the sync cursor is written
+  last, so a run that dies halfway leaves both sides consistent and the next run
+  finishes the job.
+- **It is idempotent.** Running it again changes nothing.
+
+Deletions leave tombstones. Without them a delete is invisible to sync — the
+other device still holds the record, pushes it back, and the thing you deleted
+reappears. Conflicts are resolved by taking the newest fact for each id, where a
+deletion is a fact with a timestamp exactly like an edit.
+
+Signing into a *different* account on a device that already holds a wardrobe
+switches sync to pull-only and says so, so one person's clothes can never be
+uploaded into another person's account. Nothing local is deleted; there is a
+button to merge it deliberately.
+
 ## Where your data lives
 
 In this browser, in IndexedDB — items, outfits, plans, and the photos themselves
-as blobs. There is no account and no server copy. That means:
+as blobs. Signed out there is no server copy at all. That means:
 
 - it works offline and starts instantly;
 - clearing site data deletes everything;
@@ -99,7 +144,12 @@ src/
     filters       Closet search, filtering, sorting
     stats         Wear counts, colour shares, cost per wear
   db/            IndexedDB: one store per collection, photos kept separate so
-                 listing a closet never deserialises an image
+                 listing a closet never deserialises an image; migrations/ is a
+                 versioned, additive upgrade path — a migration that throws
+                 leaves the app unable to open at all
+  sync/          merge.ts holds every rule about what wins, as pure functions;
+                 engine.ts orchestrates; transport.ts is the seam that lets the
+                 whole thing be tested without Firebase
   store/         Zustand stores, one per concern, hydrated once by AppShell
   lib/           Image processing, background removal, weather, backup, the
                  client half of the AI layer

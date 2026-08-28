@@ -7,6 +7,8 @@ import type {
   PackingList,
   Preferences,
   StylistMessage,
+  SyncState,
+  Tombstone,
   WearLog,
   WeatherSnapshot,
   WishlistItem,
@@ -26,7 +28,7 @@ export interface StoredPhoto {
  * stylist thread. Everything with a real identity gets its own store.
  */
 export interface MetaRecord {
-  key: 'preferences' | 'weather' | 'stylist' | 'schemaNotes';
+  key: 'preferences' | 'weather' | 'stylist' | 'sync';
   value: unknown;
 }
 
@@ -65,6 +67,11 @@ export interface OutfitAIDB extends DBSchema {
     key: string;
     value: StoredPhoto;
   };
+  deletions: {
+    key: string;
+    value: Tombstone;
+    indexes: { deletedAt: string };
+  };
   meta: {
     key: MetaRecord['key'];
     value: MetaRecord;
@@ -75,5 +82,5 @@ export type MetaShapes = {
   preferences: Preferences;
   weather: WeatherSnapshot;
   stylist: StylistMessage[];
-  schemaNotes: Record<string, unknown>;
+  sync: SyncState;
 };
