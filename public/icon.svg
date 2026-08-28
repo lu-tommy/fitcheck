@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="OutfitAI">
+  <rect width="512" height="512" rx="112" fill="#c8553d"/>
+  <path d="M196 128h120l82 46-34 74-34-19v155a12 12 0 0 1-12 12H194a12 12 0 0 1-12-12V229l-34 19-34-74 82-46z"
+        fill="#faf8f5"/>
+  <path d="M216 128c0 22 18 40 40 40s40-18 40-40" fill="none" stroke="#c8553d" stroke-width="18"
+        stroke-linecap="round"/>
+</svg>

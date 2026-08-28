@@ -1,36 +1,118 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OutfitAI — web
 
-## Getting Started
+Photograph the clothes you already own, and get outfits built from that closet
+and nothing else. No shopping suggestions dressed up as styling.
 
-First, run the development server:
+Next.js 16 · React 19 · TypeScript · Tailwind v4 · Zustand · IndexedDB.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## Run it
+
+```sh
+npm install
+npm run dev        # http://localhost:3000
+npm test           # 90 tests over the domain logic
+npm run typecheck
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**No keys are required.** With nothing configured everything works: adding
+clothes, generating outfits, planning a week, packing a trip, laundry, stats and
+the weather all run locally. Adding a key (see `.env.example`) upgrades tagging
+and styling from rule-based to Claude-powered.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+To look around before photographing anything, tap **try a demo wardrobe** on the
+home screen (or **You → Load a demo wardrobe**). Demo pieces have no photo and
+render as colour blocks, so it stays obvious which ones are placeholders.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open it on your phone with `npm run dev -- -H 0.0.0.0` and visit the Network URL
+it prints. It installs to the home screen as a PWA.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## What runs where
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Feature | Without a key | With a key |
+|---|---|---|
+| Tagging a photo | Colour is detected on-device; you fill in the rest | Claude reads the photo and fills the fields in |
+| Outfit generation | On-device scoring engine, with written reasoning | Claude, grounded in your closet |
+| Stylist | Answers by running the engine and narrating it | Claude, answering your actual question |
+| Packing lists | Heuristic re-wear planner | Claude |
+| Wishlist gap analysis | Unavailable | Claude |
+| Background removal | On-device flood fill (plain backgrounds) | Cut-out provider, if configured |
+| Weather | Works — Open-Meteo, no key needed | — |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The home screen's daily suggestion **always** uses the on-device engine, even
+when a key is present. Opening the app should not cost money; the Generate
+screen is where a considered suggestion belongs.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Where your data lives
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+In this browser, in IndexedDB — items, outfits, plans, and the photos themselves
+as blobs. There is no account and no server copy. That means:
+
+- it works offline and starts instantly;
+- clearing site data deletes everything;
+- **You → Export** writes a single JSON backup including the photos, and
+  **Import** restores it, which is how you move to another browser or device.
+
+Photos are downscaled to 1400px and re-encoded before they are stored, so a
+200-piece closet stays inside the browser's quota.
+
+---
+
+## Architecture
+
+```
+src/
+  types/         The domain model. Slots are the backbone: they decide how an
+                 outfit stacks and which pieces can coexist.
+  domain/        Pure, framework-free, fully tested.
+    taxonomy      Categories → slot, warmth, default formality
+    color         HSL harmony analysis, neutrals, pairing suggestions
+    outfitEngine  The rule-based outfit builder (and the AI fallback)
+    packingEngine Re-wear planner
+    filters       Closet search, filtering, sorting
+    stats         Wear counts, colour shares, cost per wear
+  db/            IndexedDB: one store per collection, photos kept separate so
+                 listing a closet never deserialises an image
+  store/         Zustand stores, one per concern, hydrated once by AppShell
+  lib/           Image processing, background removal, weather, backup, the
+                 client half of the AI layer
+  server/        The Anthropic client. The key never leaves this directory.
+  app/           Routes. Every screen is a client component, because the data
+                 lives in the browser.
+  components/    ui/ primitives, then closet/, outfit/, stats/
+```
+
+### Two rules worth knowing before you edit
+
+**Every AI path has a local counterpart.** `lib/ai.ts` is the only place that
+decides which one runs, and it never throws: a missing key, a network failure or
+a hallucinated item id all fall back to the engine and report `source: 'local'`.
+The UI labels which one produced a result rather than hiding it.
+
+**Resolve item ids with `useResolvedItems`, not a selector.** Zustand v5 compares
+snapshots by reference, so a selector that maps ids to a fresh array on every
+call re-renders forever. The hook memoises on the id string.
+
+---
+
+## Testing
+
+`npm test` covers the domain layer — the outfit engine's slot rules and
+layering coherence, colour harmony and neutral detection, filters, packing and
+stats. The interesting cases are in `src/__tests__/coherence.test.ts`: both bugs
+it covers (a wool jumper layered over shorts, and cream being called an orange
+accent) were invisible to the code and to the tests until a real outfit was
+rendered and looked at.
+
+---
+
+## Relationship to the native app
+
+This is the web rehearsal for a React Native / Expo app. The `domain/`, `types/`
+and `lib/` layers are deliberately framework-free and port across unchanged; only
+`app/`, `components/`, `db/` and the photo pipeline are web-specific.

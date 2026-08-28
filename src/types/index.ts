@@ -1,0 +1,343 @@
+/**
+ * Domain model for OutfitAI.
+ *
+ * Everything the app persists or sends to the AI is described here. Slots are
+ * the backbone: they decide how an outfit stacks visually and which pieces can
+ * coexist (you cannot wear two pairs of shoes, but you can layer a hoodie under
+ * a jacket).
+ */
+
+export type Slot =
+  | 'headwear'
+  | 'top'
+  | 'midlayer'
+  | 'outerwear'
+  | 'fullbody'
+  | 'bottom'
+  | 'footwear'
+  | 'accessory';
+
+export type Category =
+  // headwear
+  | 'hat'
+  | 'cap'
+  | 'beanie'
+  // tops
+  | 'tshirt'
+  | 'polo'
+  | 'shirt'
+  | 'blouse'
+  | 'tank'
+  | 'longsleeve'
+  // mid layers
+  | 'sweater'
+  | 'hoodie'
+  | 'cardigan'
+  | 'vest'
+  // outerwear
+  | 'jacket'
+  | 'coat'
+  | 'blazer'
+  | 'parka'
+  // full body
+  | 'dress'
+  | 'jumpsuit'
+  | 'suit'
+  // bottoms
+  | 'jeans'
+  | 'chinos'
+  | 'dress-pants'
+  | 'shorts'
+  | 'joggers'
+  | 'skirt'
+  // footwear
+  | 'sneakers'
+  | 'boots'
+  | 'dress-shoes'
+  | 'loafers'
+  | 'sandals'
+  // accessories
+  | 'watch'
+  | 'belt'
+  | 'necklace'
+  | 'bracelet'
+  | 'ring'
+  | 'sunglasses'
+  | 'scarf'
+  | 'tie'
+  | 'bag'
+  | 'gloves'
+  | 'other';
+
+export type Pattern =
+  | 'solid'
+  | 'striped'
+  | 'checked'
+  | 'plaid'
+  | 'floral'
+  | 'graphic'
+  | 'camo'
+  | 'polka-dot'
+  | 'houndstooth'
+  | 'textured'
+  | 'other';
+
+export type Formality =
+  | 'very-casual'
+  | 'casual'
+  | 'smart-casual'
+  | 'business-casual'
+  | 'formal'
+  | 'black-tie';
+
+export type Season = 'spring' | 'summer' | 'fall' | 'winter';
+
+export type Style =
+  | 'casual'
+  | 'streetwear'
+  | 'business-casual'
+  | 'formal'
+  | 'athletic'
+  | 'minimalist'
+  | 'outdoor'
+  | 'preppy'
+  | 'vintage';
+
+export type LaundryStatus = 'clean' | 'dirty' | 'washing';
+
+export interface ClothingItem {
+  id: string;
+  /**
+   * Keys into the `photos` object store, not URLs. Blobs live in IndexedDB and
+   * are turned into object URLs on demand, so nothing here goes stale when the
+   * page reloads.
+   */
+  photoId?: string;
+  /** Background-removed PNG, when available. Preferred for outfit previews. */
+  cutoutId?: string;
+  name: string;
+  category: Category;
+  primaryColor: string;
+  primaryColorHex: string;
+  secondaryColors: string[];
+  pattern: Pattern;
+  material?: string;
+  brand?: string;
+  formality: Formality;
+  seasons: Season[];
+  styles: Style[];
+  favorite: boolean;
+  laundry: LaundryStatus;
+  wearCount: number;
+  lastWornAt?: string;
+  notes?: string;
+  purchasePrice?: number;
+  createdAt: string;
+  updatedAt: string;
+  /** Provenance of the attributes above. */
+  detection: {
+    source: 'ai' | 'manual' | 'seed';
+    model?: string;
+    confidence?: number;
+    /** True once the user has edited any AI-detected field. */
+    editedByUser: boolean;
+  };
+}
+
+/** The subset of an item the AI is allowed to see when picking outfits. */
+export interface ClosetDigestItem {
+  id: string;
+  name: string;
+  category: Category;
+  slot: Slot;
+  primaryColor: string;
+  secondaryColors: string[];
+  pattern: Pattern;
+  material?: string;
+  brand?: string;
+  formality: Formality;
+  seasons: Season[];
+  styles: Style[];
+  favorite: boolean;
+  wearCount: number;
+}
+
+export interface Outfit {
+  id: string;
+  name: string;
+  itemIds: string[];
+  occasion?: string;
+  notes?: string;
+  favorite: boolean;
+  /** Why the AI put these together — shown on the outfit detail screen. */
+  explanation?: string;
+  colorNotes?: string;
+  weatherContext?: string;
+  source: 'ai' | 'manual';
+  timesWorn: number;
+  lastWornAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A record of an outfit actually being worn. Drives history and stats. */
+export interface WearLog {
+  id: string;
+  outfitId?: string;
+  itemIds: string[];
+  date: string;
+  occasion?: string;
+  note?: string;
+  createdAt: string;
+}
+
+export interface CalendarEntry {
+  id: string;
+  /** YYYY-MM-DD, local. */
+  date: string;
+  outfitId: string;
+  label?: string;
+  createdAt: string;
+}
+
+export interface PackingDayPlan {
+  day: number;
+  label: string;
+  itemIds: string[];
+}
+
+export interface PackingList {
+  id: string;
+  destination: string;
+  days: number;
+  startDate?: string;
+  activities: string[];
+  weatherSummary?: string;
+  itemIds: string[];
+  dayPlans: PackingDayPlan[];
+  notes?: string;
+  packedItemIds: string[];
+  createdAt: string;
+}
+
+export interface WishlistItem {
+  id: string;
+  name: string;
+  category: Category;
+  colorName?: string;
+  brand?: string;
+  price?: number;
+  url?: string;
+  imageUri?: string;
+  /** Why this piece would earn its place — AI-suggested or user-written. */
+  reason?: string;
+  source: 'ai' | 'manual';
+  purchased: boolean;
+  createdAt: string;
+}
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+export type Units = 'metric' | 'imperial';
+
+export interface Preferences {
+  displayName?: string;
+  themeMode: ThemeMode;
+  units: Units;
+  preferredStyles: Style[];
+  avoidColors: string[];
+  dailySuggestion: {
+    enabled: boolean;
+    hour: number;
+    minute: number;
+  };
+  /** Cached so the home screen can render weather before location resolves. */
+  lastLocation?: {
+    latitude: number;
+    longitude: number;
+    label: string;
+  };
+  /** How new photos get their background removed. See lib/backgroundRemoval. */
+  backgroundRemoval: BackgroundRemovalMode;
+}
+
+/**
+ * `off` keeps the original photo. `local` runs the in-browser edge flood-fill,
+ * which is instant and private but only works against a plain backdrop. `api`
+ * posts to /api/cutout, which needs a cutout provider key on the server.
+ */
+export type BackgroundRemovalMode = 'off' | 'local' | 'api';
+
+export interface WeatherSnapshot {
+  temperature: number;
+  feelsLike: number;
+  high: number;
+  low: number;
+  /** WMO weather code from Open-Meteo. */
+  code: number;
+  condition: string;
+  precipitationChance: number;
+  windSpeed: number;
+  units: Units;
+  locationLabel: string;
+  fetchedAt: string;
+  /** Next few days, used by the calendar and packing mode. */
+  daily?: DailyForecast[];
+}
+
+export interface DailyForecast {
+  /** YYYY-MM-DD, local to the forecast location. */
+  date: string;
+  high: number;
+  low: number;
+  code: number;
+  condition: string;
+  precipitationChance: number;
+}
+
+/** Everything the generator screen collects before asking the AI. */
+export interface OutfitRequest {
+  prompt: string;
+  occasion?: string;
+  formality?: Formality;
+  temperature?: number;
+  weatherCondition?: string;
+  colorPreference?: string;
+  style?: Style;
+  includeItemIds: string[];
+  excludeItemIds: string[];
+  /** Skip anything not marked clean. */
+  cleanOnly: boolean;
+}
+
+export interface OutfitAlternative {
+  slot: Slot;
+  itemId: string;
+  why: string;
+}
+
+export interface GeneratedOutfit {
+  name: string;
+  itemIds: string[];
+  explanation: string;
+  colorNotes: string;
+  alternatives: OutfitAlternative[];
+  /** Populated locally when the model references an item that no longer exists. */
+  warnings?: string[];
+}
+
+export interface StylistMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  createdAt: string;
+  /** Items the assistant referenced, resolved to real closet ids. */
+  referencedItemIds?: string[];
+}
+
+export interface PackingRequest {
+  destination: string;
+  days: number;
+  startDate?: string;
+  activities: string[];
+  weatherSummary?: string;
+}
