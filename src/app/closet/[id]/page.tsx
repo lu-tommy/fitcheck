@@ -1,6 +1,6 @@
 'use client';
 
-import { Droplets, Heart, PenLine, Sparkles, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, Droplets, Heart, PenLine, Sparkles, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { use, useMemo, useState } from 'react';
 
@@ -39,7 +39,8 @@ import type { LaundryStatus } from '@/types';
 export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
   const { id } = use(params);
   const router = useRouter();
-  const { items, updateItem, deleteItem, toggleFavorite, setLaundry, hydrated } = useCloset();
+  const { items, updateItem, deleteItem, toggleFavorite, setLaundry, setArchived, hydrated } =
+    useCloset();
   const item = items.find((entry) => entry.id === id);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ItemDraft | null>(null);
@@ -325,6 +326,39 @@ export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
           </Button>
         </div>
 
+        {item.archived ? (
+          <div className="card space-y-3 p-4">
+            <p className="text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
+              Archived. It keeps its history but stays out of your closet, outfits and stats.
+            </p>
+            <Button
+              full
+              icon={<ArchiveRestore size={16} />}
+              onClick={async () => {
+                await setArchived(item.id, false);
+                toast('Back in your closet', { tone: 'success' });
+              }}
+            >
+              Put it back
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="secondary"
+            full
+            icon={<Archive size={16} />}
+            onClick={async () => {
+              await setArchived(item.id, true);
+              toast(`${item.name} archived`, {
+                action: { label: 'Undo', run: () => void setArchived(item.id, false) },
+              });
+              router.back();
+            }}
+          >
+            Archive instead of deleting
+          </Button>
+        )}
+
         <Button
           variant="danger"
           full
@@ -374,8 +408,9 @@ export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
         }
       >
         <p className="py-2 text-[0.9375rem] leading-relaxed text-[var(--text-muted)]">
-          {item.name} and its photo will be removed. Saved outfits that used it will show one
-          fewer piece. This cannot be undone.
+          {item.name} and its photo will be removed for good. Saved outfits that used it will show
+          one fewer piece, and its wear history goes with it. If you just want it out of the way,
+          archive it instead.
         </p>
       </Sheet>
     </div>

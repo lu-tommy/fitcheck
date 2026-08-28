@@ -13,7 +13,7 @@ import { CYCLE_LABEL, careSummary, loadActionLabel, planWashLoads } from '@/doma
 import { categoryLabel } from '@/domain/taxonomy';
 import { cn } from '@/lib/cn';
 import { pluralize } from '@/lib/format';
-import { useCloset } from '@/store/closet';
+import { useCloset, useActiveItems } from '@/store/closet';
 import { toast } from '@/store/toast';
 import type { ClothingItem, LaundryStatus } from '@/types';
 
@@ -24,7 +24,8 @@ const NEXT: Record<LaundryStatus, LaundryStatus> = {
 };
 
 export default function LaundryPage() {
-  const { items, setLaundry, washAll } = useCloset();
+  const { setLaundry, washAll } = useCloset();
+  const items = useActiveItems();
   const [tab, setTab] = useState<LaundryStatus>('dirty');
 
   const buckets = useMemo(

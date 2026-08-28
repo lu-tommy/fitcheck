@@ -90,6 +90,9 @@ src/
   domain/        Pure, framework-free, fully tested.
     taxonomy      Categories → slot, warmth, default formality
     care          Care labels, material defaults, and the wash-load planner
+    collage       Laying an outfit out as a flat lay
+    memories      What the wear log is for — a year ago today, and so on
+    weekPlanner   Seven days at once, each against its own forecast
     color         HSL harmony analysis, neutrals, pairing suggestions
     outfitEngine  The rule-based outfit builder (and the AI fallback)
     packingEngine Re-wear planner
@@ -126,6 +129,24 @@ binned. That is what stops a pair of shoes photographed on a duvet coming back
 the colour of the duvet. If discarding the backdrop leaves almost nothing, the
 garment fills the frame and *is* that colour, so the filter is dropped.
 
+## The outfit as a picture
+
+A generated outfit renders as a flat lay, not a list: pieces laid out the way
+they fall on a bed, sized by how much of the outfit they carry, tilted so it
+reads as cloth rather than a grid. The composition is deterministic — pieces are
+placed by slot — and can be rearranged by dragging, in which case the
+arrangement is saved with the outfit.
+
+The same placements drive `lib/outfitImage`, which paints the outfit onto a
+canvas and hands it to the share sheet, so **what you arrange is exactly what
+you send**. Nothing is uploaded and it works offline. Rendering a five-piece
+outfit from real photos takes about 300ms on a throttled phone.
+
+**Which one?** — the generator can build a second option, excluding everything
+in the first so the two are genuinely different, and share both as a single
+picture. This is the one feature in the roadmap that the commercial apps
+structurally cannot copy: their user is one person alone with an app.
+
 ## Care instructions
 
 Each item can carry its label — wash, cycle, dry, iron, bleach, plus the short
@@ -152,6 +173,21 @@ snapshots by reference, so a selector that maps ids to a fresh array on every
 call re-renders forever. The hook memoises on the id string.
 
 ---
+
+## Archiving, planning, remembering
+
+- **Archive, not delete.** A piece can be taken out of circulation while keeping
+  its photo and its wear history. Archived items leave the closet, the
+  generator, the stats and the laundry planner — every screen goes through
+  `useActiveItems()` rather than the raw store.
+- **Plan the week.** One tap fills seven days from what is clean, each against
+  that day's forecast. Pieces worn recently carry a scoring penalty rather than
+  an exclusion — with one pair of shoes you should still get shoes every day,
+  and the rule that survives longest is the one that matters most, which is not
+  repeating a top.
+- **Memories.** What you wore a year ago today, the coat you have not touched
+  since spring, the jeans out four times this fortnight. All of it from records
+  already kept, which is what makes logging an outfit worth the tap.
 
 ## Testing
 

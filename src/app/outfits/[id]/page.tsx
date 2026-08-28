@@ -1,16 +1,20 @@
 'use client';
 
-import { CalendarPlus, Check, Copy, Heart, Trash2 } from 'lucide-react';
+import { CalendarPlus, Check, Copy, Heart, LayoutGrid, List, Share2, Trash2, Wand2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { use, useState } from 'react';
 
+import { OutfitCollage } from '@/components/outfit/OutfitCollage';
 import { OutfitStack } from '@/components/outfit/OutfitStack';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/Feedback';
 import { Field, Input, Textarea } from '@/components/ui/Field';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Sheet } from '@/components/ui/Sheet';
+import { autoLayout } from '@/domain/collage';
+import { renderOutfitImage, shareImage } from '@/lib/outfitImage';
 import { formatFriendlyDate, formatRelative, todayKey } from '@/lib/date';
 import { cn } from '@/lib/cn';
 import { pluralize } from '@/lib/format';
@@ -18,6 +22,7 @@ import { useResolvedItems } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
 import { usePlanner } from '@/store/planner';
 import { toast } from '@/store/toast';
+import type { CollagePlacement } from '@/types';
 
 export default function OutfitDetailPage({ params }: PageProps<'/outfits/[id]'>) {
   const { id } = use(params);
@@ -36,6 +41,10 @@ export default function OutfitDetailPage({ params }: PageProps<'/outfits/[id]'>)
   const [planning, setPlanning] = useState(false);
   const [planDate, setPlanDate] = useState(todayKey());
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [view, setView] = useState<'collage' | 'list'>('collage');
+  const [arranging, setArranging] = useState(false);
+  const [draftLayout, setDraftLayout] = useState<CollagePlacement[] | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   if (!hydrated) return <div className="skeleton m-5 h-96 rounded-[var(--radius-card)]" />;
 
@@ -91,7 +100,102 @@ export default function OutfitDetailPage({ params }: PageProps<'/outfits/[id]'>)
           </Badge>
         </div>
 
-        <OutfitStack items={items} onSelect={(item) => router.push(`/closet/${item.id}`)} />
+        <SegmentedControl<'collage' | 'list'>
+          value={view}
+          onChange={(next) => {
+            setView(next);
+            setArranging(false);
+          }}
+          options={[
+            { value: 'collage', label: 'Flat lay' },
+            { value: 'list', label: 'List' },
+          ]}
+        />
+
+        {view === 'collage' ? (
+          <>
+            <OutfitCollage
+              items={items}
+              layout={arranging ? (draftLayout ?? outfit.layout) : outfit.layout}
+              onChange={arranging ? setDraftLayout : undefined}
+              onSelect={(item) => router.push(`/closet/${item.id}`)}
+            />
+
+            {arranging ? (
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  full
+                  onClick={() => {
+                    setDraftLayout(autoLayout(items));
+                  }}
+                >
+                  Reset
+                </Button>
+                <Button
+                  full
+                  onClick={async () => {
+                    if (draftLayout) await updateOutfit(outfit.id, { layout: draftLayout });
+                    setArranging(false);
+                    setDraftLayout(null);
+                    toast('Arrangement saved', { tone: 'success' });
+                  }}
+                >
+                  Done
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  full
+                  icon={<Wand2 size={16} />}
+                  onClick={() => {
+                    setDraftLayout(outfit.layout ?? autoLayout(items));
+                    setArranging(true);
+                  }}
+                >
+                  Arrange
+                </Button>
+                <Button
+                  variant="secondary"
+                  full
+                  icon={<Share2 size={16} />}
+                  disabled={sharing || !items.length}
+                  onClick={async () => {
+                    setSharing(true);
+                    let blob: Blob;
+                    try {
+                      blob = await renderOutfitImage(items, {
+                        title: outfit.name,
+                        subtitle: outfit.occasion,
+                        layout: outfit.layout,
+                      });
+                    } catch (error) {
+                      toast((error as Error).message, { tone: 'danger' });
+                      setSharing(false);
+                      return;
+                    }
+                    // The spinner covers the render, not the share sheet: once
+                    // the OS takes the file, the button must work again even if
+                    // the sheet is left open or never reports back.
+                    setSharing(false);
+                    const result = await shareImage(
+                      blob,
+                      `${slugify(outfit.name)}.png`,
+                      outfit.name,
+                    );
+                    if (result === 'downloaded') toast('Saved to your downloads');
+                  }}
+                >
+                  {sharing ? 'Rendering…' : 'Share'}
+                </Button>
+              </div>
+            )}
+          </>
+        ) : (
+          <OutfitStack items={items} onSelect={(item) => router.push(`/closet/${item.id}`)} />
+        )}
 
         {missing > 0 ? (
           <p className="rounded-2xl bg-[var(--warning-soft)] p-3 text-[0.8125rem] text-[var(--warning)]">
@@ -286,5 +390,16 @@ export default function OutfitDetailPage({ params }: PageProps<'/outfits/[id]'>)
         </p>
       </Sheet>
     </div>
+  );
+}
+
+/** Filenames should survive being sent through a messaging app. */
+function slugify(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40) || 'outfit'
   );
 }

@@ -13,7 +13,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { planPacking } from '@/lib/ai';
 import { pluralize } from '@/lib/format';
 import { formatRelative } from '@/lib/date';
-import { useCloset } from '@/store/closet';
+import { useActiveItems } from '@/store/closet';
 import { usePlanner } from '@/store/planner';
 import { toast } from '@/store/toast';
 import { useWeather } from '@/store/weather';
@@ -31,7 +31,7 @@ const ACTIVITIES = [
 
 export default function PackingPage() {
   const router = useRouter();
-  const { items } = useCloset();
+  const items = useActiveItems();
   const { packingLists, savePackingList } = usePlanner();
   const weather = useWeather((state) => state.snapshot);
 

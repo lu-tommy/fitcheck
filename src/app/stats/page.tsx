@@ -11,11 +11,12 @@ import { ButtonLink } from '@/components/ui/Button';
 import { EmptyState, SectionHeader } from '@/components/ui/Feedback';
 import { computeStats } from '@/domain/stats';
 import { pluralize, titleCase } from '@/lib/format';
-import { useCloset } from '@/store/closet';
+import { useCloset, useActiveItems } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
 
 export default function StatsPage() {
-  const { items, hydrated } = useCloset();
+  const { hydrated } = useCloset();
+  const items = useActiveItems();
   const { outfits, wearLogs } = useOutfits();
 
   const stats = useMemo(

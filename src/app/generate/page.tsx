@@ -1,10 +1,11 @@
 'use client';
 
-import { ArrowLeftRight, Check, Sparkles, X } from 'lucide-react';
+import { ArrowLeftRight, Check, Share2, Sparkles, Split, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 
 import { ItemTile } from '@/components/closet/ItemTile';
+import { OutfitCollage } from '@/components/outfit/OutfitCollage';
 import { OutfitStack } from '@/components/outfit/OutfitStack';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -23,14 +24,15 @@ import {
   slotOf,
 } from '@/domain/taxonomy';
 import { generateOutfit, type AiSource } from '@/lib/ai';
+import { renderComparisonImage, shareImage } from '@/lib/outfitImage';
 import { COLOR_NAMES, swatches } from '@/lib/palette';
 import { titleCase } from '@/lib/format';
-import { useCloset, useResolvedItems } from '@/store/closet';
+import { useActiveItems, useCloset, useResolvedItems } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
 import { usePreferences } from '@/store/preferences';
 import { toast } from '@/store/toast';
 import { useWeather } from '@/store/weather';
-import type { Formality, GeneratedOutfit, Style } from '@/types';
+import type { ClothingItem, Formality, GeneratedOutfit, Style } from '@/types';
 
 export default function GeneratePage() {
   return (
@@ -43,7 +45,8 @@ export default function GeneratePage() {
 function Generator() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { items, hydrated } = useCloset();
+  const { hydrated } = useCloset();
+  const items = useActiveItems();
   const saveGenerated = useOutfits((state) => state.saveGenerated);
   const wearOutfit = useOutfits((state) => state.wearOutfit);
   const preferences = usePreferences((state) => state.preferences);
@@ -61,6 +64,8 @@ function Generator() {
 
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ outfit: GeneratedOutfit; source: AiSource } | null>(null);
+  const [rival, setRival] = useState<GeneratedOutfit | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   // "Style this" from an item page arrives as a query parameter.
   const preselected = searchParams.get('include');
@@ -69,6 +74,7 @@ function Generator() {
   }, [preselected]);
 
   const resultItems = useResolvedItems(result?.outfit.itemIds);
+  const rivalItems = useResolvedItems(rival?.itemIds);
   const includeItems = useResolvedItems(includeIds);
   const excludeItems = useResolvedItems(excludeIds);
 
@@ -102,7 +108,66 @@ function Generator() {
       avoidColors: preferences.avoidColors,
     });
     setResult(generated);
+    setRival(null);
     setBusy(false);
+  }
+
+  /**
+   * A second opinion. The pieces already chosen are excluded so the engine has
+   * to reach for something genuinely different rather than shuffling the same
+   * outfit — a comparison between two near-identical looks helps nobody.
+   */
+  async function runRival() {
+    if (!result) return;
+    setBusy(true);
+    const pool = cleanOnly ? items.filter((item) => item.laundry === 'clean') : items;
+    const generated = await generateOutfit({
+      request: {
+        prompt: prompt.trim() || occasion || 'Something good for today',
+        occasion,
+        formality: formality || undefined,
+        style: style || undefined,
+        colorPreference: colorPreference || undefined,
+        temperature: weather?.temperature,
+        weatherCondition: weather?.condition,
+        includeItemIds: includeIds,
+        excludeItemIds: [...excludeIds, ...result.outfit.itemIds],
+        cleanOnly,
+      },
+      closet: pool,
+      weather,
+      preferredStyles: preferences.preferredStyles,
+      avoidColors: preferences.avoidColors,
+    });
+    setBusy(false);
+    if (generated.outfit.itemIds.length < 2) {
+      toast('Not enough clean clothes left for a second option', { tone: 'danger' });
+      return;
+    }
+    setRival(generated.outfit);
+  }
+
+  async function askSomeone() {
+    if (!result || !rival) return;
+    setSharing(true);
+    let blob: Blob;
+    try {
+      blob = await renderComparisonImage(
+        { items: resultItems, label: 'A' },
+        { items: rivalItems, label: 'B' },
+        { title: occasion ? `Which one for ${occasion.toLowerCase()}?` : 'Which one?' },
+      );
+    } catch (error) {
+      toast((error as Error).message, { tone: 'danger' });
+      setSharing(false);
+      return;
+    }
+    // Rendering is the slow part and the part that can fail; handing the file
+    // to the OS is neither. Releasing the button here means a share sheet the
+    // user ignores cannot leave the screen stuck.
+    setSharing(false);
+    const outcome = await shareImage(blob, 'which-one.png', 'A or B?');
+    if (outcome === 'downloaded') toast('Saved to your downloads — send it on');
   }
 
   async function save(alsoWear: boolean) {
@@ -169,14 +234,56 @@ function Generator() {
             {result.source === 'ai' ? 'Styled by Claude' : 'Built by the on-device engine'}
           </Badge>
 
-          <OutfitStack items={resultItems} onSelect={(item) => router.push(`/closet/${item.id}`)} />
+          {rival ? (
+            <section className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Option
+                  label="A"
+                  items={resultItems}
+                  onChoose={() => setRival(null)}
+                />
+                <Option
+                  label="B"
+                  items={rivalItems}
+                  onChoose={() => {
+                    setResult({ outfit: rival, source: result.source });
+                    setRival(null);
+                  }}
+                />
+              </div>
+              <Button
+                full
+                variant="secondary"
+                icon={<Share2 size={16} />}
+                disabled={sharing}
+                onClick={askSomeone}
+              >
+                {sharing ? 'Rendering…' : 'Ask someone which'}
+              </Button>
+              <p className="text-center text-[0.8125rem] text-[var(--text-muted)]">
+                Sends one picture of both. Tap a look to go with it.
+              </p>
+            </section>
+          ) : (
+            <>
+              <OutfitCollage
+                items={resultItems}
+                onSelect={(item) => router.push(`/closet/${item.id}`)}
+              />
+              <OutfitStack
+                items={resultItems}
+                onSelect={(item) => router.push(`/closet/${item.id}`)}
+              />
+            </>
+          )}
 
-          {result.outfit.warnings?.length ? (
+          {!rival && result.outfit.warnings?.length ? (
             <div className="rounded-2xl bg-[var(--warning-soft)] p-3 text-[0.8125rem] text-[var(--warning)]">
               {result.outfit.warnings.join(' ')}
             </div>
           ) : null}
 
+          {rival ? null : (
           <section className="card p-4">
             <h2 className="text-heading">Why this works</h2>
             <p className="mt-2 text-[0.9375rem] leading-relaxed text-[var(--text-muted)]">
@@ -207,8 +314,9 @@ function Generator() {
               </div>
             ) : null}
           </section>
+          )}
 
-          {result.outfit.alternatives?.length ? (
+          {!rival && result.outfit.alternatives?.length ? (
             <section>
               <SectionHeader title="Swap something" />
               <div className="space-y-2">
@@ -240,6 +348,18 @@ function Generator() {
               </div>
             </section>
           ) : null}
+
+          {rival ? null : (
+            <Button
+              variant="secondary"
+              full
+              icon={<Split size={16} />}
+              disabled={busy}
+              onClick={() => void runRival()}
+            >
+              {busy ? 'Building a second option…' : 'Can\u2019t decide? Compare two'}
+            </Button>
+          )}
 
           <div className="flex gap-2">
             <Button variant="secondary" full onClick={() => void run()} disabled={busy}>
@@ -413,6 +533,30 @@ function Generator() {
         </div>
       </Sheet>
     </div>
+  );
+}
+
+function Option({
+  label,
+  items,
+  onChoose,
+}: {
+  label: string;
+  items: ClothingItem[];
+  onChoose: () => void;
+}) {
+  return (
+    <button type="button" onClick={onChoose} className="pressable text-left">
+      <OutfitCollage items={items} />
+      <span className="mt-2 flex items-center gap-2 px-0.5">
+        <span className="grid size-6 place-items-center rounded-full bg-[var(--brand)] text-[0.75rem] font-bold text-[var(--on-brand)]">
+          {label}
+        </span>
+        <span className="min-w-0 truncate text-[0.8125rem] text-[var(--text-muted)]">
+          {items.map((item) => item.name).join(', ')}
+        </span>
+      </span>
+    </button>
   );
 }
 

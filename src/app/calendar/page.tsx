@@ -1,11 +1,12 @@
 'use client';
 
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { OutfitThumb } from '@/components/outfit/OutfitStack';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, ButtonLink } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Feedback';
 import { EmptyState } from '@/components/ui/Feedback';
 import { Sheet } from '@/components/ui/Sheet';
 import {
@@ -18,8 +19,11 @@ import {
   todayKey,
 } from '@/lib/date';
 import { cn } from '@/lib/cn';
-import { useResolvedItems } from '@/store/closet';
+import { planWeek } from '@/domain/weekPlanner';
+import { useActiveItems, useResolvedItems } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
+import { usePreferences } from '@/store/preferences';
+import { useWeather } from '@/store/weather';
 import { usePlanner } from '@/store/planner';
 import { toast } from '@/store/toast';
 import type { Outfit } from '@/types';
@@ -27,10 +31,14 @@ import type { Outfit } from '@/types';
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export default function CalendarPage() {
-  const { outfits } = useOutfits();
+  const { outfits, saveOutfit } = useOutfits();
   const { calendar, assign, unassign } = usePlanner();
+  const items = useActiveItems();
+  const weather = useWeather((state) => state.snapshot);
+  const preferences = usePreferences((state) => state.preferences);
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [picking, setPicking] = useState<string | null>(null);
+  const [planning, setPlanning] = useState(false);
 
   const days = useMemo(() => monthGrid(month), [month]);
   const byDate = useMemo(() => {
@@ -56,6 +64,52 @@ export default function CalendarPage() {
       <PageHeader title="Calendar" subtitle="Decide tonight what you wear tomorrow" />
 
       <div className="space-y-6 px-5">
+        <Button
+          full
+          icon={<CalendarRange size={17} />}
+          disabled={planning || items.length < 3}
+          onClick={async () => {
+            setPlanning(true);
+            const dates = Array.from({ length: 7 }, (_, index) =>
+              toDateKey(addDays(new Date(), index)),
+            );
+            const week = planWeek({
+              closet: items,
+              weather,
+              preferredStyles: preferences.preferredStyles,
+              avoidColors: preferences.avoidColors,
+              dates,
+            });
+            if (!week.length) {
+              setPlanning(false);
+              toast('Not enough clean clothes to plan a week', { tone: 'danger' });
+              return;
+            }
+            for (const day of week) {
+              const saved = await saveOutfit({
+                name: day.outfit.name,
+                itemIds: day.outfit.itemIds,
+                explanation: day.outfit.explanation,
+                colorNotes: day.outfit.colorNotes,
+                weatherContext: day.forecast
+                  ? `${Math.round(day.forecast.low)}–${Math.round(day.forecast.high)}°C, ${day.forecast.condition}`
+                  : undefined,
+                source: 'ai',
+              });
+              await assign(day.date, saved.id);
+            }
+            setPlanning(false);
+            toast(`Next ${week.length} days planned`, { tone: 'success' });
+          }}
+        >
+          {planning ? <Spinner label="Planning your week" /> : 'Plan the next 7 days'}
+        </Button>
+
+        <p className="-mt-3 text-center text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
+          Builds a week from what is clean, using each day&rsquo;s forecast and keeping pieces off
+          back-to-back days. Anything already planned is replaced.
+        </p>
+
         <section className="card p-4">
           <div className="mb-3 flex items-center justify-between">
             <button

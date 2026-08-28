@@ -180,6 +180,13 @@ export interface ClothingItem {
   styles: Style[];
   favorite: boolean;
   laundry: LaundryStatus;
+  /**
+   * Kept, but out of circulation — the piece you no longer wear and cannot
+   * bring yourself to bin. Archived items keep their history and stay out of
+   * the closet, the generator and the stats.
+   */
+  archived?: boolean;
+  archivedAt?: string;
   wearCount: number;
   lastWornAt?: string;
   notes?: string;
@@ -216,10 +223,26 @@ export interface ClosetDigestItem {
   wearCount: number;
 }
 
+/** Where one piece sits on the collage. All values are fractions of the canvas. */
+export interface CollagePlacement {
+  itemId: string;
+  /** Centre of the piece. */
+  x: number;
+  y: number;
+  /** Width as a fraction of the canvas width. */
+  size: number;
+  /** Stacking order, low to high. */
+  z: number;
+  /** Slight tilt, in degrees — what stops a flat lay looking like a spreadsheet. */
+  rotation: number;
+}
+
 export interface Outfit {
   id: string;
   name: string;
   itemIds: string[];
+  /** Hand-adjusted collage. Absent means the automatic composition is used. */
+  layout?: CollagePlacement[];
   occasion?: string;
   notes?: string;
   favorite: boolean;

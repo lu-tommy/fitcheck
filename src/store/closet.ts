@@ -26,6 +26,7 @@ interface ClosetState {
   deleteItem: (id: string) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   setLaundry: (id: string, laundry: LaundryStatus) => Promise<void>;
+  setArchived: (id: string, archived: boolean) => Promise<void>;
   /** Called when an outfit is worn: bumps counts and dirties everything in it. */
   markWorn: (itemIds: string[]) => Promise<void>;
   washAll: () => Promise<void>;
@@ -102,6 +103,18 @@ export const useCloset = create<ClosetState>((set, get) => ({
     await get().updateItem(id, { laundry });
   },
 
+  /**
+   * Archiving is the honest alternative to deleting. The piece keeps its wear
+   * history and its photo, and leaves the closet, the generator and the stats
+   * — which is what someone actually wants when they say "I never wear this".
+   */
+  setArchived: async (id, archived) => {
+    await get().updateItem(id, {
+      archived,
+      archivedAt: archived ? nowIso() : undefined,
+    });
+  },
+
   markWorn: async (itemIds) => {
     const stamp = nowIso();
     const updated = get()
@@ -163,4 +176,10 @@ export function useResolvedItems(ids: string[] | undefined): ClothingItem[] {
       .map((id) => index.get(id))
       .filter((item): item is ClothingItem => Boolean(item));
   }, [items, key]);
+}
+
+/** The wardrobe in circulation: everything except what has been archived. */
+export function useActiveItems(): ClothingItem[] {
+  const items = useCloset((state) => state.items);
+  return useMemo(() => items.filter((item) => !item.archived), [items]);
 }

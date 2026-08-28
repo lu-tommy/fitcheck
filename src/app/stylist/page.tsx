@@ -9,7 +9,7 @@ import { Button, ButtonLink } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { cn } from '@/lib/cn';
-import { useCloset, useResolvedItems } from '@/store/closet';
+import { useActiveItems, useResolvedItems } from '@/store/closet';
 import { useStylist } from '@/store/stylist';
 import { useWeather } from '@/store/weather';
 import type { StylistMessage } from '@/types';
@@ -23,7 +23,7 @@ const STARTERS = [
 ];
 
 export default function StylistPage() {
-  const { items } = useCloset();
+  const items = useActiveItems();
   const { thread, pending, ask, clear } = useStylist();
   const weather = useWeather((state) => state.snapshot);
   const [draft, setDraft] = useState('');

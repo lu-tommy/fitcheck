@@ -27,6 +27,15 @@ export interface EngineContext {
   preferredStyles?: Style[];
   avoidColors?: string[];
   season?: Season;
+  /**
+   * Pieces worn in the last day or two, when planning several days at once.
+   *
+   * A soft penalty rather than an exclusion, deliberately: someone with one
+   * pair of shoes should still get shoes every day. Excluding them outright
+   * forces the planner to relax every constraint at once, and the first thing
+   * it loses is the rule that actually matters — not repeating a top.
+   */
+  restingItemIds?: string[];
 }
 
 interface ScoredItem {
@@ -110,6 +119,10 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
   // Laundry.
   if (item.laundry === 'dirty') score -= request.cleanOnly ? 1000 : 40;
   if (item.laundry === 'washing') score -= request.cleanOnly ? 1000 : 25;
+
+  // Big enough to lose against any fresh alternative, small enough that a
+  // resting piece still beats leaving the slot empty.
+  if (context.restingItemIds?.includes(item.id)) score -= 150;
 
   if (request.includeItemIds.includes(item.id)) score += 500;
   if (request.excludeItemIds.includes(item.id)) score -= 1000;

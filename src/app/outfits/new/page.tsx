@@ -12,14 +12,14 @@ import { EmptyState } from '@/components/ui/Feedback';
 import { Field, Input } from '@/components/ui/Field';
 import { analyzeHarmony } from '@/domain/color';
 import { SLOT_LABEL, SLOT_ORDER, slotOf } from '@/domain/taxonomy';
-import { useCloset, useResolvedItems } from '@/store/closet';
+import { useActiveItems, useResolvedItems } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
 import { toast } from '@/store/toast';
 import type { Slot } from '@/types';
 
 export default function OutfitBuilderPage() {
   const router = useRouter();
-  const { items } = useCloset();
+  const items = useActiveItems();
   const saveOutfit = useOutfits((state) => state.saveOutfit);
 
   const [selected, setSelected] = useState<string[]>([]);

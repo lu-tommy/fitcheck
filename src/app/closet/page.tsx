@@ -1,10 +1,12 @@
 'use client';
 
-import { Plus, Search, SlidersHorizontal, Shirt } from 'lucide-react';
+import { Archive, Plus, Search, SlidersHorizontal, Shirt } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ItemTile } from '@/components/closet/ItemTile';
 import { PageHeader } from '@/components/PageHeader';
+import Link from 'next/link';
+
 import { ButtonLink, Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/Feedback';
@@ -23,7 +25,7 @@ import { cn } from '@/lib/cn';
 import { useDebounced } from '@/lib/hooks';
 import { titleCase, pluralize } from '@/lib/format';
 import { swatches } from '@/lib/palette';
-import { useCloset } from '@/store/closet';
+import { useCloset, useActiveItems } from '@/store/closet';
 import type { Season, Slot, Style } from '@/types';
 
 const SORTS: { value: ClosetSort; label: string }[] = [
@@ -34,12 +36,14 @@ const SORTS: { value: ClosetSort; label: string }[] = [
 ];
 
 export default function ClosetPage() {
-  const { items, hydrated } = useCloset();
+  const { hydrated } = useCloset();
+  const items = useActiveItems();
   const [filters, setFilters] = useState<ClosetFilters>(EMPTY_FILTERS);
   const [query, setQuery] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
   const debouncedQuery = useDebounced(query, 180);
 
+  const archivedCount = useCloset((state) => state.items).filter((item) => item.archived).length;
   const colors = useMemo(() => availableColors(items), [items]);
   const brands = useMemo(() => availableBrands(items), [items]);
 
@@ -167,6 +171,16 @@ export default function ClosetPage() {
             </div>
           </>
         )}
+
+        {archivedCount ? (
+          <Link
+            href="/closet/archive"
+            className="pressable mt-6 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--border-strong)] py-3 text-[0.875rem] text-[var(--text-muted)]"
+          >
+            <Archive size={15} />
+            {pluralize(archivedCount, 'archived piece')}
+          </Link>
+        ) : null}
       </div>
 
       <Sheet

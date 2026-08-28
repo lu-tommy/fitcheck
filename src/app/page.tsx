@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
 import { OutfitPill } from '@/components/outfit/OutfitCard';
+import { MemoryCard } from '@/components/MemoryCard';
 import { SafetyCard } from '@/components/SafetyCard';
 import { OutfitStack } from '@/components/outfit/OutfitStack';
 import { WeatherCard } from '@/components/WeatherCard';
@@ -14,7 +15,7 @@ import { buildOutfitLocally } from '@/domain/outfitEngine';
 import { demoWardrobe } from '@/domain/seed';
 import { formatFriendlyDate, todayKey } from '@/lib/date';
 import { pluralize } from '@/lib/format';
-import { useCloset, useResolvedItems } from '@/store/closet';
+import { useActiveItems, useCloset, useResolvedItems } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
 import { usePlanner } from '@/store/planner';
 import { usePreferences } from '@/store/preferences';
@@ -23,7 +24,8 @@ import { useWeather } from '@/store/weather';
 import type { Outfit } from '@/types';
 
 export default function HomePage() {
-  const { items, hydrated, addItems } = useCloset();
+  const { hydrated, addItems } = useCloset();
+  const items = useActiveItems();
   const { outfits, wearLogs, saveOutfit, wearOutfit } = useOutfits();
   const entryFor = usePlanner((state) => state.entryFor);
   const preferences = usePreferences((state) => state.preferences);
@@ -220,6 +222,8 @@ export default function HomePage() {
             </span>
           </Link>
         ) : null}
+
+        <MemoryCard />
 
         {recentlyWorn.length ? (
           <Row title="Recently worn" outfits={recentlyWorn} />

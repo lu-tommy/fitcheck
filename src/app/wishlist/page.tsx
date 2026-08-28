@@ -13,13 +13,13 @@ import { CATEGORIES, categoryLabel } from '@/domain/taxonomy';
 import { aiConfigured, suggestWishlist } from '@/lib/ai';
 import { cn } from '@/lib/cn';
 import { titleCase } from '@/lib/format';
-import { useCloset } from '@/store/closet';
+import { useActiveItems } from '@/store/closet';
 import { toast } from '@/store/toast';
 import { useWishlist } from '@/store/wishlist';
 import type { Category } from '@/types';
 
 export default function WishlistPage() {
-  const items = useCloset((state) => state.items);
+  const items = useActiveItems();
   const { items: wishes, add, removeItem, togglePurchased } = useWishlist();
 
   const [adding, setAdding] = useState(false);
