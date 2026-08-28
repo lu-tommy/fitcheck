@@ -177,6 +177,7 @@ src/
     collage       Laying an outfit out as a flat lay
     memories      What the wear log is for — a year ago today, and so on
     weekPlanner   Seven days at once, each against its own forecast
+    shopping      Whether a piece you are thinking of buying earns its place
     color         HSL harmony analysis, neutrals, pairing suggestions
     outfitEngine  The rule-based outfit builder (and the AI fallback)
     packingEngine Re-wear planner
@@ -263,6 +264,39 @@ snapshots by reference, so a selector that maps ids to a fresh array on every
 call re-renders forever. The hook memoises on the id string.
 
 ---
+
+## Before you buy
+
+The question a wardrobe app can answer and a shop cannot: not whether a thing
+is nice, but whether anything you own goes with it. Pick a category and a
+colour and it answers with a number it can defend — the candidate is treated as
+a real garment, forced into the closet, and the outfit engine is asked to dress
+five different days around it. What comes back is how many of them completed.
+
+It also names what the piece would pair with, spots something near enough to it
+that you already own, and shows which slots the wardrobe is thinnest in.
+Pairings are ranked on more than colour: against a neutral almost everything
+scores in the high eighties, so what she actually wears, whether the two suit
+the same weather, and whether they belong at the same kind of occasion all
+count.
+
+## Daily reminders
+
+One push notification a day, sent by this server, with no third party and
+nothing to pay for. Set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (generate a
+pair with `node -e "console.log(require('web-push').generateVAPIDKeys())"`) and
+a loop started by `src/instrumentation.ts` sends anything due, once a minute,
+in the reader's own timezone.
+
+Three things have to line up before the switch can be turned on, and the
+setting says which one is missing rather than pretending: the browser must
+support push, permission must be granted, and **on iOS the app must be on the
+home screen** — Safari refuses push to a site open in a tab.
+
+The notification is a nudge, not a prediction. The server holds the wardrobe but
+not the weather or the reader's units, so an outfit named in a notification
+would differ from the one the app shows on open. Saying "your outfit is ready"
+is honest; naming the wrong outfit is not.
 
 ## Archiving, planning, remembering
 

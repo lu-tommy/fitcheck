@@ -72,3 +72,45 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
+
+/* ------------------------------------------------------------ reminders -- */
+
+self.addEventListener('push', (event) => {
+  let payload = { title: 'OutfitAI', body: 'Time to pick today’s outfit.', url: '/' };
+  try {
+    if (event.data) payload = { ...payload, ...event.data.json() };
+  } catch {
+    // A malformed payload still deserves a notification; the defaults do.
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      // One reminder at a time: a new one replaces yesterday's rather than
+      // stacking up unread in the shade.
+      tag: 'outfitai-daily',
+      renotify: true,
+      data: { url: payload.url },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      // Reuse a tab that is already open rather than piling up new ones.
+      for (const client of windows) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(target);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    }),
+  );
+});

@@ -11,6 +11,7 @@ import {
   LogOut,
   Luggage,
   Scissors,
+  ShoppingBag,
   Upload,
   UserRound,
   WashingMachine,
@@ -19,6 +20,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import { PageHeader } from '@/components/PageHeader';
+import { ReminderSetting } from '@/components/ReminderSetting';
 import { SyncStatus } from '@/components/SyncStatus';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
@@ -45,6 +47,7 @@ const LINKS = [
   { href: '/packing', label: 'Packing', hint: 'Build a suitcase', icon: Luggage },
   { href: '/laundry', label: 'Laundry', hint: 'What is clean', icon: WashingMachine },
   { href: '/stats', label: 'Statistics', hint: 'What you actually wear', icon: BarChart3 },
+  { href: '/shop', label: 'Before you buy', hint: 'Will it go with what you own?', icon: ShoppingBag },
   { href: '/wishlist', label: 'Wishlist', hint: 'Things you are thinking of buying', icon: Heart },
   { href: '/closet/archive', label: 'Archive', hint: 'Kept, but out of rotation', icon: Archive },
 ] as const;
@@ -375,14 +378,7 @@ export default function ProfilePage() {
               }}
             />
 
-            <Switch
-              checked={preferences.dailySuggestion.enabled}
-              onChange={(enabled) =>
-                void update({ dailySuggestion: { ...preferences.dailySuggestion, enabled } })
-              }
-              label="Daily outfit reminder"
-              hint="Shows today's suggestion on the home screen first thing. Push notifications arrive with the native app."
-            />
+            <ReminderSetting />
 
             {!items.length ? (
               <Button

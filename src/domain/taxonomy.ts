@@ -108,6 +108,22 @@ export const SLOT_LABEL: Record<Slot, string> = {
   accessory: 'Accessories',
 };
 
+/**
+ * The same slots as group headings. "Top" labels one garment in an outfit;
+ * "Tops" labels the shelf they came from, and the two read differently enough
+ * to be worth spelling out rather than pluralising by hand at each call site.
+ */
+export const SLOT_LABEL_PLURAL: Record<Slot, string> = {
+  headwear: 'Headwear',
+  outerwear: 'Outerwear',
+  midlayer: 'Layers',
+  top: 'Tops',
+  fullbody: 'Full pieces',
+  bottom: 'Bottoms',
+  footwear: 'Shoes',
+  accessory: 'Accessories',
+};
+
 /** Slots that may only hold one item in a valid outfit. */
 export const SINGLE_ITEM_SLOTS: Slot[] = [
   'headwear',

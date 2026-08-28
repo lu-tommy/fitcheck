@@ -20,7 +20,16 @@ import {
   type ClosetFilters,
   type ClosetSort,
 } from '@/domain/filters';
-import { SEASONS, SEASON_LABEL, SLOT_LABEL, SLOT_ORDER, STYLES, STYLE_LABEL } from '@/domain/taxonomy';
+import {
+  SEASONS,
+  SEASON_LABEL,
+  SLOT_LABEL,
+  SLOT_LABEL_PLURAL,
+  SLOT_ORDER,
+  STYLES,
+  STYLE_LABEL,
+  slotOf,
+} from '@/domain/taxonomy';
 import { cn } from '@/lib/cn';
 import { useDebounced } from '@/lib/hooks';
 import { titleCase, pluralize } from '@/lib/format';
@@ -53,6 +62,14 @@ export default function ClosetPage() {
   );
 
   const activeCount = countActiveFilters(filters);
+  /*
+   * A flat grid of eighty squares is a pile, not a wardrobe. Grouping by slot
+   * gives it shape — but only while nothing is narrowing the view, because a
+   * filtered result is already a specific question and headings just get in
+   * the way of the answer.
+   */
+  const grouped =
+    !debouncedQuery && filters.slots.length === 0 && filters.sort === 'recent' && visible.length > 8;
   const update = (patch: Partial<ClosetFilters>) =>
     setFilters((current) => ({ ...current, ...patch }));
   const toggle = <T,>(list: T[], value: T): T[] =>
@@ -163,12 +180,36 @@ export default function ClosetPage() {
           <>
             <p className="mb-3 text-[0.8125rem] text-[var(--text-muted)]">
               {pluralize(visible.length, 'piece')}
+              {grouped ? ' · grouped by type' : ''}
             </p>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              {visible.map((item) => (
-                <ItemTile key={item.id} item={item} href={`/closet/${item.id}`} />
-              ))}
-            </div>
+
+            {grouped ? (
+              <div className="space-y-7">
+                {SLOT_ORDER.map((slot) => {
+                  const inSlot = visible.filter((item) => slotOf(item.category) === slot);
+                  if (!inSlot.length) return null;
+                  return (
+                    <section key={slot}>
+                      <h2 className="text-label mb-2.5 flex items-baseline justify-between text-[var(--text-muted)]">
+                        <span>{SLOT_LABEL_PLURAL[slot]}</span>
+                        <span className="text-[var(--text-faint)]">{inSlot.length}</span>
+                      </h2>
+                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                        {inSlot.map((item) => (
+                          <ItemTile key={item.id} item={item} href={`/closet/${item.id}`} />
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {visible.map((item) => (
+                  <ItemTile key={item.id} item={item} href={`/closet/${item.id}`} />
+                ))}
+              </div>
+            )}
           </>
         )}
 

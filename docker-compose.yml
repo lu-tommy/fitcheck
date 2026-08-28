@@ -17,6 +17,11 @@ services:
       OUTFITAI_SECRET: ${OUTFITAI_SECRET:?set OUTFITAI_SECRET in .env}
       # name:salt:hash entries separated by ; — see npm run add-user
       OUTFITAI_USERS: ${OUTFITAI_USERS:?set OUTFITAI_USERS in .env}
+      # Daily reminders. Without these the app runs fine and the reminder
+      # setting says plainly that it is not configured.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:outfitai@localhost}
     volumes:
       # The wardrobes. Back this folder up and nothing else matters.
       - ./data:/data

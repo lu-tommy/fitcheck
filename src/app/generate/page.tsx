@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeftRight, Check, Share2, Sparkles, Split, X } from 'lucide-react';
+import { ArrowLeftRight, Check, ChevronDown, Share2, Sparkles, Split, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 
@@ -77,6 +77,18 @@ function Generator() {
   const rivalItems = useResolvedItems(rival?.itemIds);
   const includeItems = useResolvedItems(includeIds);
   const excludeItems = useResolvedItems(excludeIds);
+
+  /** What the collapsed panel says, so a set option is never hidden silently. */
+  const refinementSummary = [
+    formality ? FORMALITY_LABEL[formality] : null,
+    style ? STYLE_LABEL[style] : null,
+    colorPreference ? titleCase(colorPreference) : null,
+    includeIds.length ? `${includeIds.length} must-have` : null,
+    excludeIds.length ? `${excludeIds.length} excluded` : null,
+    cleanOnly ? null : 'including dirty',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const harmony = useMemo(
     () =>
@@ -379,7 +391,7 @@ function Generator() {
       <PageHeader title="Generate" subtitle="Describe the day. It picks from your closet." />
 
       <div className="space-y-6 px-5">
-        <Field label="What is the occasion?">
+        <Field label="Where are you going?">
           <Textarea
             rows={3}
             value={prompt}
@@ -389,7 +401,6 @@ function Generator() {
         </Field>
 
         <div>
-          <span className="text-label mb-2 block text-[var(--text-muted)]">Quick picks</span>
           <div className="flex flex-wrap gap-2">
             {OCCASIONS.map((entry) => (
               <Chip
@@ -411,6 +422,18 @@ function Generator() {
           </div>
         </div>
 
+        <details className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+          <summary className="pressable flex cursor-pointer list-none items-center justify-between gap-3">
+            <span>
+              <span className="block text-[0.9375rem] font-medium">Anything else?</span>
+              <span className="mt-0.5 block text-[0.8125rem] text-[var(--text-muted)]">
+                {refinementSummary || 'Formality, colour, pieces to include or leave out'}
+              </span>
+            </span>
+            <ChevronDown size={17} className="shrink-0 text-[var(--text-faint)]" />
+          </summary>
+
+          <div className="mt-4 space-y-5 border-t border-[var(--border)] pt-4">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Formality">
             <Select
@@ -485,6 +508,9 @@ function Generator() {
             </span>
           </button>
         </section>
+
+          </div>
+        </details>
 
         {weather ? (
           <p className="text-center text-[0.8125rem] text-[var(--text-muted)]">

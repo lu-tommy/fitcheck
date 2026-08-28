@@ -1,5 +1,5 @@
 import { hexForColorName } from '@/domain/color';
-import { slotOf } from '@/domain/taxonomy';
+import { SLOT_LABEL_PLURAL, slotOf } from '@/domain/taxonomy';
 import type { ClothingItem, Outfit, Slot, WearLog } from '@/types';
 
 export interface ColorShare {
@@ -64,7 +64,7 @@ export function computeStats(
   });
 
   const slotShares: SlotShare[] = [...slotCounts.entries()]
-    .map(([slot, count]) => ({ slot, label: labelForSlot(slot), count }))
+    .map(([slot, count]) => ({ slot, label: SLOT_LABEL_PLURAL[slot], count }))
     .sort((a, b) => b.count - a.count);
 
   const byWear = [...items].sort((a, b) => b.wearCount - a.wearCount);
@@ -96,26 +96,4 @@ export function computeStats(
       .sort((a, b) => a.costPerWear - b.costPerWear),
     busiestDay: busiest ? { date: busiest[0], count: busiest[1] } : null,
   };
-}
-
-function labelForSlot(slot: Slot): string {
-  switch (slot) {
-    case 'headwear':
-      return 'Headwear';
-    case 'top':
-      return 'Tops';
-    case 'midlayer':
-      return 'Layers';
-    case 'outerwear':
-      return 'Outerwear';
-    case 'fullbody':
-      return 'Full pieces';
-    case 'bottom':
-      return 'Bottoms';
-    case 'footwear':
-      return 'Shoes';
-    case 'accessory':
-    default:
-      return 'Accessories';
-  }
 }
