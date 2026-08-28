@@ -91,7 +91,9 @@ export function OutfitCollage({
       onPointerCancel={endDrag}
       className={cn(
         'relative aspect-4/5 w-full overflow-hidden rounded-[var(--radius-card)]',
-        'border border-[var(--border)] bg-[var(--surface-alt)]',
+        // A ground a shade darker than the card, so a cream shirt on a white
+        // tile still reads as an object rather than disappearing into it.
+        'border border-[var(--border)] bg-[var(--surface-sunken)]',
         editable && 'touch-none',
         className,
       )}
@@ -129,7 +131,7 @@ export function OutfitCollage({
                 );
                 const shell = cn(
                   'block w-full overflow-hidden rounded-xl',
-                  'shadow-[0_8px_20px_-10px_rgba(0,0,0,0.35)]',
+                  'ring-1 ring-black/5 shadow-[0_10px_24px_-12px_rgba(0,0,0,0.45)]',
                   selected && 'ring-2 ring-[var(--brand)]',
                 );
 

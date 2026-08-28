@@ -86,7 +86,7 @@ export function MemoryCard({ className }: { className?: string }) {
       <button
         type="button"
         onClick={() => setDismissed((current) => [...current, memory.title])}
-        className="pressable mt-3 text-[0.8125rem] text-[var(--text-faint)]"
+        className="pressable -mb-1 mt-1.5 px-1.5 py-3 text-[0.8125rem] text-[var(--text-faint)]"
       >
         Show me something else
       </button>

@@ -149,7 +149,8 @@ export default function HomePage() {
 
       <div className="space-y-6 px-5">
         <SafetyCard />
-        <WeatherCard />
+        {/* Permission prompts before any value earned is how apps get refused. */}
+        {items.length ? <WeatherCard /> : null}
 
         {!hydrated ? (
           <div className="skeleton h-56 rounded-[var(--radius-card)]" />
@@ -228,14 +229,22 @@ export default function HomePage() {
             <SectionHeader
               title="Planned for today"
               action={
-                <Link href="/calendar" className="text-[0.8125rem] text-[var(--brand)]">
+                <Link
+                  href="/calendar"
+                  className="pressable -my-3 px-1.5 py-3 text-[0.8125rem] text-[var(--brand)]"
+                >
                   Calendar
                 </Link>
               }
             />
             <div className="card p-4">
               <p className="text-title">{plannedOutfit.name}</p>
-              <OutfitStack items={plannedItems} className="mt-3" />
+              <OutfitCollage
+                items={plannedItems}
+                layout={plannedOutfit.layout}
+                onSelect={(item) => router.push(`/closet/${item.id}`)}
+                className="mt-3"
+              />
               <Button
                 full
                 className="mt-3"
@@ -254,16 +263,19 @@ export default function HomePage() {
             <SectionHeader
               title="Suggested for today"
               action={
-                <Link href="/generate" className="text-[0.8125rem] text-[var(--brand)]">
+                <Link
+                  href="/generate"
+                  className="pressable -my-3 px-1.5 py-3 text-[0.8125rem] text-[var(--brand)]"
+                >
                   Change
                 </Link>
               }
             />
             <div className="card p-4">
-              <OutfitStack items={suggestionItems} />
-              <p className="mt-3 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
-                {suggestion.explanation}
-              </p>
+              <OutfitCollage
+                items={suggestionItems}
+                onSelect={(item) => router.push(`/closet/${item.id}`)}
+              />
               <div className="mt-3 flex gap-2">
                 <Button full icon={<Check size={17} />} onClick={saveSuggestion}>
                   Wear this
@@ -272,6 +284,9 @@ export default function HomePage() {
                   Something else
                 </ButtonLink>
               </div>
+              <p className="mt-3 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
+                {suggestion.explanation}
+              </p>
             </div>
           </section>
         ) : (
@@ -337,7 +352,10 @@ function Row({ title, outfits }: { title: string; outfits: Outfit[] }) {
       <SectionHeader
         title={title}
         action={
-          <Link href="/outfits" className="text-[0.8125rem] text-[var(--brand)]">
+          <Link
+            href="/outfits"
+            className="pressable -my-3 px-1.5 py-3 text-[0.8125rem] text-[var(--brand)]"
+          >
             See all
           </Link>
         }

@@ -266,7 +266,7 @@ export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
           <button
             type="button"
             onClick={startEditing}
-            className="pressable mt-3 text-[0.875rem] font-medium text-[var(--brand)]"
+            className="pressable -mx-1 mt-2 px-1 py-2 text-[0.875rem] font-medium text-[var(--brand)]"
           >
             {item.care ? 'Edit care instructions' : 'Add care instructions'}
           </button>

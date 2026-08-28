@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, Plus, Search, SlidersHorizontal, Shirt } from 'lucide-react';
+import { Archive, ChevronRight, Plus, Search, SlidersHorizontal, Shirt } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ItemTile } from '@/components/closet/ItemTile';
@@ -23,7 +23,7 @@ import {
 import {
   SEASONS,
   SEASON_LABEL,
-  SLOT_LABEL,
+  SLOT_BROWSE_ORDER,
   SLOT_LABEL_PLURAL,
   SLOT_ORDER,
   STYLES,
@@ -133,13 +133,13 @@ export default function ClosetPage() {
           <Chip selected={filters.cleanOnly} onClick={() => update({ cleanOnly: !filters.cleanOnly })}>
             Clean only
           </Chip>
-          {SLOT_ORDER.map((slot) => (
+          {SLOT_BROWSE_ORDER.map((slot) => (
             <Chip
               key={slot}
               selected={filters.slots.includes(slot)}
               onClick={() => update({ slots: toggle(filters.slots, slot) })}
             >
-              {SLOT_LABEL[slot]}
+              {SLOT_LABEL_PLURAL[slot]}
             </Chip>
           ))}
         </div>
@@ -180,23 +180,43 @@ export default function ClosetPage() {
           <>
             <p className="mb-3 text-[0.8125rem] text-[var(--text-muted)]">
               {pluralize(visible.length, 'piece')}
-              {grouped ? ' · grouped by type' : ''}
+              {grouped ? ' · tap a heading to see all of one kind' : ''}
             </p>
 
             {grouped ? (
-              <div className="space-y-7">
-                {SLOT_ORDER.map((slot) => {
+              /*
+               * Shelves, not one long grid. Eighteen pieces in a two-column
+               * grid is already a 6,000px scroll; a hundred and fifty is
+               * unusable. A row per kind gives the whole wardrobe at a glance,
+               * and the heading opens that shelf in full.
+               */
+              <div className="space-y-6">
+                {SLOT_BROWSE_ORDER.map((slot) => {
                   const inSlot = visible.filter((item) => slotOf(item.category) === slot);
                   if (!inSlot.length) return null;
                   return (
                     <section key={slot}>
-                      <h2 className="text-label mb-2.5 flex items-baseline justify-between text-[var(--text-muted)]">
-                        <span>{SLOT_LABEL_PLURAL[slot]}</span>
-                        <span className="text-[var(--text-faint)]">{inSlot.length}</span>
-                      </h2>
-                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                      <button
+                        type="button"
+                        onClick={() => update({ slots: [slot] })}
+                        className="pressable mb-2.5 flex w-full items-baseline justify-between gap-3"
+                      >
+                        <span className="text-label text-[var(--text-muted)]">
+                          {SLOT_LABEL_PLURAL[slot]}
+                        </span>
+                        <span className="flex items-center gap-1 text-[0.75rem] text-[var(--text-faint)]">
+                          {inSlot.length}
+                          <ChevronRight size={13} />
+                        </span>
+                      </button>
+                      <div className="scroll-row -mx-5 flex gap-3 px-5 pb-1">
                         {inSlot.map((item) => (
-                          <ItemTile key={item.id} item={item} href={`/closet/${item.id}`} />
+                          <ItemTile
+                            key={item.id}
+                            item={item}
+                            href={`/closet/${item.id}`}
+                            className="w-28 shrink-0"
+                          />
                         ))}
                       </div>
                     </section>
@@ -253,13 +273,13 @@ export default function ClosetPage() {
           </Group>
 
           <Group title="Type">
-            {SLOT_ORDER.map((slot) => (
+            {SLOT_BROWSE_ORDER.map((slot) => (
               <Chip
                 key={slot}
                 selected={filters.slots.includes(slot)}
                 onClick={() => update({ slots: toggle<Slot>(filters.slots, slot) })}
               >
-                {SLOT_LABEL[slot]}
+                {SLOT_LABEL_PLURAL[slot]}
               </Chip>
             ))}
           </Group>

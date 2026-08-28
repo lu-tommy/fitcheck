@@ -105,3 +105,31 @@ describe('pairing suggestions', () => {
     expect(suggestPairings(hexForColorName('red'), 'red').length).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe('swap suggestions', () => {
+  const closet = [
+    makeItem({ id: 'tee', category: 'tshirt', primaryColor: 'white', formality: 'casual' }),
+    makeItem({ id: 'shirt', category: 'shirt', primaryColor: 'blue', formality: 'business-casual' }),
+    makeItem({ id: 'jeans', category: 'jeans', primaryColor: 'denim' }),
+    makeItem({ id: 'chinos', category: 'chinos', primaryColor: 'tan' }),
+    makeItem({ id: 'sneakers', category: 'sneakers', primaryColor: 'white' }),
+    makeItem({ id: 'boots', category: 'boots', primaryColor: 'brown' }),
+  ];
+
+  const alternatives = () =>
+    buildOutfitLocally({ request: { ...request, temperature: 18 }, closet }).alternatives;
+
+  it('says what a swap actually changes rather than repeating itself', () => {
+    const reasons = alternatives().map((entry) => entry.why);
+    expect(reasons.length).toBeGreaterThan(1);
+    // Three identical "a different take" lines tell the wearer nothing.
+    expect(new Set(reasons).size).toBe(reasons.length);
+  });
+
+  it('names the axis that moves', () => {
+    const reasons = alternatives()
+      .map((entry) => entry.why)
+      .join(' ');
+    expect(reasons).toMatch(/sharper|more relaxed|warmer|lighter|brown|tan|blue|white|denim/);
+  });
+});

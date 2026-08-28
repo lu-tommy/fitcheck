@@ -130,6 +130,38 @@ function InstallCard({
   onInstall: () => void;
   onDismiss: () => void;
 }) {
+  /*
+   * A slim bar, not a card. This matters — it is important, but it was the
+   * largest thing on the home screen, pushing the actual product below the
+   * fold on first run. Explaining why only once it has been tapped keeps the
+   * reason available without spending the whole screen on it.
+   */
+  if (!expanded) {
+    return (
+      <section className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5">
+        <ShieldCheck size={16} className="shrink-0 text-[var(--brand)]" />
+        <span className="min-w-0 flex-1 text-[0.8125rem] leading-snug">
+          Add to your home screen so nothing clears your wardrobe.
+        </span>
+        <button
+          type="button"
+          onClick={promptable ? onInstall : onExpand}
+          className="pressable -my-3 shrink-0 px-2 py-3 text-[0.8125rem] font-semibold text-[var(--brand)]"
+        >
+          {promptable ? 'Install' : 'How'}
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Not now"
+          className="pressable -my-2 -mr-1 grid size-10 shrink-0 place-items-center rounded-full text-[var(--text-faint)]"
+        >
+          <X size={15} />
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section className="card p-4">
       <div className="flex items-start gap-3">
@@ -139,8 +171,9 @@ function InstallCard({
         <div className="min-w-0 flex-1">
           <h2 className="text-[0.9375rem] font-semibold">Add OutfitAI to your home screen</h2>
           <p className="mt-1 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
-            Not just for convenience: browsers clear the storage of sites you haven&rsquo;t opened
-            in a while, and an installed app is exempt. It also opens without a connection.
+            Browsers clear the storage of sites you have not opened in a while, and an installed
+            app is exempt. It also opens without a connection, and it is the only way iOS will
+            send you a reminder.
           </p>
         </div>
         <button

@@ -308,31 +308,47 @@ export default function AddPage() {
         <button
           type="button"
           onClick={() => outfitInput.current?.click()}
-          className="card pressable flex w-full items-center gap-3 p-4 text-left"
+          className="card pressable flex w-full items-center gap-3 border-[var(--brand)] p-4 text-left"
         >
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--brand)] text-[var(--on-brand)]">
             <Scissors size={18} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[0.9375rem] font-medium">One photo, several pieces</span>
+            <span className="block text-[0.9375rem] font-medium">
+              One photo, several pieces{' '}
+              <span className="text-[0.75rem] font-semibold text-[var(--brand)]">FASTEST</span>
+            </span>
             <span className="block text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
               Photograph a whole outfit, or use a picture you liked, and box each garment out of it.
             </span>
           </span>
         </button>
 
-        <p className="text-center text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
-          Shoot one piece at a time against a plain wall or floor.
-          {backgroundRemoval === 'off' ? (
-            <>
-              {' '}
-              Background removal is off — turn it on under{' '}
-              <span className="text-[var(--text)]">You → Photos</span>.
-            </>
-          ) : (
-            ' The background is cut out automatically, in this browser.'
-          )}
-        </p>
+        {queue.length ? null : (
+          <section className="card p-4">
+            <h2 className="text-heading">Getting a good photo</h2>
+            <ul className="mt-3 space-y-2.5">
+              {[
+                'Lay the piece on a plain floor, bed or wall — the plainer the background, the cleaner the cut-out.',
+                'Fill most of the frame with the garment, and shoot straight down rather than at an angle.',
+                'In a hurry? Lay several things out together and use “one photo, several pieces”.',
+              ].map((tip, index) => (
+                <li key={tip} className="flex gap-3 text-[0.875rem] leading-relaxed">
+                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--surface-alt)] text-[0.6875rem] font-semibold text-[var(--text-muted)]">
+                    {index + 1}
+                  </span>
+                  <span className="text-[var(--text-muted)]">{tip}</span>
+                </li>
+              ))}
+            </ul>
+            {backgroundRemoval === 'off' ? (
+              <p className="mt-3 border-t border-[var(--border)] pt-3 text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
+                Background removal is off — turn it on under{' '}
+                <span className="text-[var(--text)]">You → Photos</span>.
+              </p>
+            ) : null}
+          </section>
+        )}
 
         {queue.length ? (
           <ul className="space-y-3">
@@ -419,7 +435,11 @@ export default function AddPage() {
       </div>
 
       <div
-        className="sticky bottom-0 mt-6 border-t border-[var(--border)] bg-[var(--bg)]/92 px-5 pt-3 backdrop-blur-xl"
+        className={cn(
+          'sticky bottom-0 mt-6 border-t border-[var(--border)] bg-[var(--bg)]/92 px-5 pt-3 backdrop-blur-xl',
+          // Nothing queued means nothing to save; an inert button just looks broken.
+          queue.length ? '' : 'hidden',
+        )}
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <Button full size="lg" onClick={saveAll} disabled={!readyCount || saving || working}>

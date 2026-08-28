@@ -109,6 +109,22 @@ export const SLOT_LABEL: Record<Slot, string> = {
 };
 
 /**
+ * The order a wardrobe is browsed in, which is not the order an outfit is
+ * stacked in. SLOT_ORDER runs head to toe because that is how a look is
+ * assembled; a person looking for something to wear starts at tops.
+ */
+export const SLOT_BROWSE_ORDER: Slot[] = [
+  'top',
+  'bottom',
+  'fullbody',
+  'footwear',
+  'outerwear',
+  'midlayer',
+  'headwear',
+  'accessory',
+];
+
+/**
  * The same slots as group headings. "Top" labels one garment in an outfit;
  * "Tops" labels the shelf they came from, and the two read differently enough
  * to be worth spelling out rather than pluralising by hand at each call site.

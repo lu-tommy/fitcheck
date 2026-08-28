@@ -256,7 +256,7 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
       return {
         slot,
         itemId: alternative.item.id,
-        why: `Swap in for a ${describeShift(alternative.item, current)} take.`,
+        why: `Swap in for ${describeShift(alternative.item, current)} take.`,
       };
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
@@ -272,12 +272,28 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
   };
 }
 
+/**
+ * What actually changes if you swap this in.
+ *
+ * Three alternatives all reading "a different take" is filler that tells the
+ * wearer nothing — it has to name the axis that moves: how dressed up it is,
+ * how warm, or failing both, the colour.
+ */
 function describeShift(candidate: ClothingItem, current?: ClothingItem): string {
-  if (!current) return 'different';
-  const delta = formalityScore(candidate.formality) - formalityScore(current.formality);
-  if (delta > 0) return 'sharper';
-  if (delta < 0) return 'more relaxed';
-  return 'different';
+  if (!current) return 'a different';
+
+  const formalityDelta = formalityScore(candidate.formality) - formalityScore(current.formality);
+  if (formalityDelta > 0) return 'a sharper';
+  if (formalityDelta < 0) return 'a more relaxed';
+
+  const warmthDelta = categoryMeta(candidate.category).warmth - categoryMeta(current.category).warmth;
+  if (warmthDelta > 0) return 'a warmer';
+  if (warmthDelta < 0) return 'a lighter';
+
+  if (candidate.primaryColor.toLowerCase() !== current.primaryColor.toLowerCase()) {
+    return `a ${candidate.primaryColor.toLowerCase()}`;
+  }
+  return 'a different';
 }
 
 function missingSlotWarnings(chosen: ClothingItem[]): string[] | undefined {
