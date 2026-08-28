@@ -144,6 +144,25 @@ function base64ToBlob(data: string, type: string): Blob {
   return new Blob([bytes], { type });
 }
 
+/**
+ * Export, download, and record that it happened — one call, because a backup
+ * the app cannot see is a backup it cannot remind you about.
+ */
+export async function runBackup(): Promise<string> {
+  const blob = await exportBackup();
+  const stamp = new Date().toISOString();
+  downloadBlob(blob, `outfitai-${stamp.slice(0, 10)}.json`);
+  return stamp;
+}
+
+/** How overdue a backup is. `null` means there has never been one. */
+export function daysSinceBackup(lastBackupAt: string | undefined): number | null {
+  if (!lastBackupAt) return null;
+  return Math.floor((Date.now() - new Date(lastBackupAt).getTime()) / 86_400_000);
+}
+
+export const BACKUP_STALE_DAYS = 14;
+
 /** Trigger a download of a blob under a given filename. */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);

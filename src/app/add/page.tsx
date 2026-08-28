@@ -1,10 +1,11 @@
 'use client';
 
-import { Camera, ImagePlus, Loader2, PenLine, Sparkles, Trash2, X } from 'lucide-react';
+import { Camera, ImagePlus, Loader2, PenLine, Scissors, Sparkles, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 
 import { EMPTY_DRAFT, ItemForm, draftLabel, type ItemDraft } from '@/components/closet/ItemForm';
+import { MultiCrop } from '@/components/closet/MultiCrop';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { hexForColorName } from '@/domain/color';
@@ -12,6 +13,7 @@ import { categoryLabel } from '@/domain/taxonomy';
 import { putPhoto } from '@/db';
 import { tagPhoto } from '@/lib/ai';
 import { removeBackground } from '@/lib/backgroundRemoval';
+import { cropToBlob, type CropBox } from '@/lib/crop';
 import { cn } from '@/lib/cn';
 import { createId } from '@/lib/id';
 import { processPhoto } from '@/lib/image';
@@ -42,8 +44,10 @@ export default function AddPage() {
   const [queue, setQueue] = useState<Pending[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [cropSource, setCropSource] = useState<Blob | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const outfitInput = useRef<HTMLInputElement>(null);
 
   const patch = useCallback((key: string, next: Partial<Pending>) => {
     setQueue((current) =>
@@ -52,13 +56,8 @@ export default function AddPage() {
   }, []);
 
   const ingest = useCallback(
-    async (files: FileList | null) => {
-      if (!files?.length) return;
-      const accepted = Array.from(files).filter((file) => file.type.startsWith('image/'));
-      if (!accepted.length) {
-        toast('Those files are not images', { tone: 'danger' });
-        return;
-      }
+    async (accepted: Blob[], options?: { autoCutout?: boolean }) => {
+      if (!accepted.length) return;
 
       const seeded: Pending[] = accepted.map((file) => ({
         key: createId('pending'),
@@ -98,7 +97,9 @@ export default function AddPage() {
                   width: processed.width,
                   height: processed.height,
                 },
-                useCutout: true,
+                // A crop out of a worn outfit rarely has a backdrop worth
+                // removing, so the cut-out is offered rather than applied.
+                useCutout: options?.autoCutout ?? true,
               });
             }
           }
@@ -129,6 +130,42 @@ export default function AddPage() {
       }
     },
     [backgroundRemoval, patch],
+  );
+
+  /** Files arriving from a picker still have to be filtered before they queue. */
+  const ingestFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files?.length) return;
+      const images = Array.from(files).filter((file) => file.type.startsWith('image/'));
+      if (!images.length) {
+        toast('Those files are not images', { tone: 'danger' });
+        return;
+      }
+      if (images.length < files.length) {
+        toast(`Skipped ${files.length - images.length} file that is not an image`);
+      }
+      void ingest(images);
+    },
+    [ingest],
+  );
+
+  /** One photo, several boxes: crop each region and queue it as its own piece. */
+  const ingestCrops = useCallback(
+    async (source: Blob, boxes: CropBox[]) => {
+      setCropSource(null);
+      try {
+        const bitmap = await createImageBitmap(source, { imageOrientation: 'from-image' });
+        const crops: Blob[] = [];
+        for (const box of boxes) {
+          crops.push(await cropToBlob(bitmap, box));
+        }
+        bitmap.close();
+        await ingest(crops, { autoCutout: false });
+      } catch (error) {
+        toast((error as Error).message || 'Could not cut that photo up', { tone: 'danger' });
+      }
+    },
+    [ingest],
   );
 
   function addBlank() {
@@ -199,6 +236,7 @@ export default function AddPage() {
         seasons: entry.draft.seasons,
         styles: entry.draft.styles,
         notes: entry.draft.notes || undefined,
+        care: entry.draft.care ?? undefined,
         purchasePrice: Number.isFinite(price) ? price : undefined,
         detection: {
           source: entry.taggedByAi ? 'ai' : 'manual',
@@ -241,7 +279,7 @@ export default function AddPage() {
         capture="environment"
         className="hidden"
         onChange={(event) => {
-          void ingest(event.target.files);
+          ingestFiles(event.target.files);
           event.target.value = '';
         }}
       />
@@ -252,8 +290,19 @@ export default function AddPage() {
         multiple
         className="hidden"
         onChange={(event) => {
-          void ingest(event.target.files);
+          ingestFiles(event.target.files);
           event.target.value = '';
+        }}
+      />
+      <input
+        ref={outfitInput}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file?.type.startsWith('image/')) setCropSource(file);
         }}
       />
 
@@ -276,6 +325,22 @@ export default function AddPage() {
             <span className="text-[0.875rem] font-medium">Choose images</span>
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={() => outfitInput.current?.click()}
+          className="card pressable flex w-full items-center gap-3 p-4 text-left"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
+            <Scissors size={18} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.9375rem] font-medium">One photo, several pieces</span>
+            <span className="block text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
+              Photograph a whole outfit, or use a picture you liked, and box each garment out of it.
+            </span>
+          </span>
+        </button>
 
         <p className="text-center text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
           Shoot one piece at a time against a plain wall or floor.
@@ -390,6 +455,14 @@ export default function AddPage() {
                 : 'Add to closet'}
         </Button>
       </div>
+
+      {cropSource ? (
+        <MultiCrop
+          file={cropSource}
+          onCancel={() => setCropSource(null)}
+          onConfirm={(boxes) => void ingestCrops(cropSource, boxes)}
+        />
+      ) : null}
 
       <Sheet
         open={Boolean(editingEntry)}

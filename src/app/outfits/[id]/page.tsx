@@ -83,9 +83,11 @@ export default function OutfitDetailPage({ params }: PageProps<'/outfits/[id]'>)
             {outfit.source === 'ai' ? 'Generated' : 'Built by you'}
           </Badge>
           <Badge>
-            {outfit.timesWorn > 0
-              ? `Worn ${pluralize(outfit.timesWorn, 'time')} · last ${formatRelative(outfit.lastWornAt).toLowerCase()}`
-              : 'Never worn'}
+            {outfit.timesWorn === 0
+              ? 'Never worn'
+              : outfit.lastWornAt
+                ? `Worn ${pluralize(outfit.timesWorn, 'time')} · last ${formatRelative(outfit.lastWornAt).toLowerCase()}`
+                : `Worn ${pluralize(outfit.timesWorn, 'time')}`}
           </Badge>
         </div>
 

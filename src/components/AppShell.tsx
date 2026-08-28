@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 
 import { cn } from '@/lib/cn';
+import { registerServiceWorker, requestPersistence } from '@/lib/persistence';
 import { Toaster } from '@/components/ui/Toaster';
 import { useCloset } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
@@ -33,6 +34,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   // One hydration pass for the whole app. Each store guards against a second
   // run, so mounting this once at the root is enough.
   useEffect(() => {
+    // Ask the browser to stop treating the wardrobe as disposable. Silent when
+    // granted, silent when refused — the Profile screen reports the outcome.
+    void requestPersistence();
+    registerServiceWorker();
+
     void usePreferences.getState().hydrate();
     void useCloset.getState().hydrate();
     void useOutfits.getState().hydrate();

@@ -272,3 +272,9 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
+
+/* Disclosure rows: Safari draws its own triangle even with list-style: none. */
+summary { list-style: none; }
+summary::-webkit-details-marker { display: none; }
+details[open] > summary svg { transform: rotate(180deg); }
+details > summary svg { transition: transform 180ms cubic-bezier(0.2, 0, 0, 1); }

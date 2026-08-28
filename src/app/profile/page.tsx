@@ -26,7 +26,8 @@ import { STYLES, STYLE_LABEL } from '@/domain/taxonomy';
 import { demoWardrobe } from '@/domain/seed';
 import { clearAll, estimateUsage } from '@/db';
 import { aiConfigured } from '@/lib/ai';
-import { downloadBlob, exportBackup, importBackup } from '@/lib/backup';
+import { BACKUP_STALE_DAYS, daysSinceBackup, importBackup, runBackup } from '@/lib/backup';
+import { persistenceState, type PersistenceState } from '@/lib/persistence';
 import { COLOR_NAMES, swatches } from '@/lib/palette';
 import { titleCase, pluralize } from '@/lib/format';
 import { useCloset } from '@/store/closet';
@@ -50,6 +51,7 @@ export default function ProfilePage() {
   const { preferences, update, setTheme } = usePreferences();
 
   const [usage, setUsage] = useState<{ usage: number; quota: number } | null>(null);
+  const [persisted, setPersisted] = useState<PersistenceState>('unknown');
   const [ai, setAi] = useState<boolean | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [working, setWorking] = useState(false);
@@ -57,8 +59,11 @@ export default function ProfilePage() {
 
   useEffect(() => {
     void estimateUsage().then(setUsage);
+    void persistenceState().then(setPersisted);
     void aiConfigured().then(setAi);
   }, [items.length]);
+
+  const backupAge = daysSinceBackup(preferences.lastBackupAt);
 
   const toggleStyle = (style: Style) =>
     update({
@@ -235,6 +240,39 @@ export default function ProfilePage() {
                 : ''}
             </p>
 
+            <div className="space-y-2 rounded-2xl bg-[var(--surface-alt)] p-3">
+              <StatusLine
+                ok={persisted === 'persisted'}
+                label={
+                  persisted === 'persisted'
+                    ? 'Storage marked as permanent'
+                    : persisted === 'unsupported'
+                      ? 'This browser cannot mark storage permanent'
+                      : 'Storage can be cleared automatically'
+                }
+                hint={
+                  persisted === 'persisted'
+                    ? 'The browser will not clear it to reclaim space.'
+                    : 'Add OutfitAI to your home screen and this usually flips on.'
+                }
+              />
+              <StatusLine
+                ok={backupAge !== null && backupAge < BACKUP_STALE_DAYS}
+                label={
+                  backupAge === null
+                    ? 'Never backed up'
+                    : backupAge === 0
+                      ? 'Backed up today'
+                      : `Backed up ${pluralize(backupAge, 'day')} ago`
+                }
+                hint={
+                  backupAge !== null && backupAge < BACKUP_STALE_DAYS
+                    ? 'Recent enough.'
+                    : 'Export a copy — it is the only thing that survives a cleared browser.'
+                }
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="secondary"
@@ -242,10 +280,15 @@ export default function ProfilePage() {
                 disabled={working}
                 onClick={async () => {
                   setWorking(true);
-                  const blob = await exportBackup();
-                  downloadBlob(blob, `outfitai-${new Date().toISOString().slice(0, 10)}.json`);
-                  setWorking(false);
-                  toast('Backup downloaded', { tone: 'success' });
+                  try {
+                    const stamp = await runBackup();
+                    await update({ lastBackupAt: stamp });
+                    toast('Backup downloaded', { tone: 'success' });
+                  } catch {
+                    toast('Could not write the backup file', { tone: 'danger' });
+                  } finally {
+                    setWorking(false);
+                  }
                 }}
               >
                 Export
@@ -345,6 +388,23 @@ export default function ProfilePage() {
           server copy, so this cannot be undone unless you exported a backup first.
         </p>
       </Sheet>
+    </div>
+  );
+}
+
+function StatusLine({ ok, label, hint }: { ok: boolean; label: string; hint: string }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <span
+        aria-hidden
+        className={`mt-1.5 size-2 shrink-0 rounded-full ${
+          ok ? 'bg-[var(--success)]' : 'bg-[var(--warning)]'
+        }`}
+      />
+      <span className="min-w-0">
+        <span className="block text-[0.875rem] font-medium">{label}</span>
+        <span className="block text-[0.8125rem] text-[var(--text-muted)]">{hint}</span>
+      </span>
     </div>
   );
 }

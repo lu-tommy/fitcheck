@@ -1,6 +1,6 @@
 'use client';
 
-import { Heart, PenLine, Sparkles, Trash2 } from 'lucide-react';
+import { Droplets, Heart, PenLine, Sparkles, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { use, useMemo, useState } from 'react';
 
@@ -12,6 +12,14 @@ import { Badge } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/Feedback';
 import { Sheet } from '@/components/ui/Sheet';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import {
+  BLEACH_LABEL,
+  DRY_LABEL,
+  FLAG_ADVICE,
+  FLAG_LABEL,
+  IRON_LABEL,
+  WASH_LABEL,
+} from '@/domain/care';
 import { hexForColorName, suggestPairings } from '@/domain/color';
 import {
   FORMALITY_LABEL,
@@ -76,6 +84,7 @@ export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
       styles: item.styles,
       purchasePrice: item.purchasePrice != null ? String(item.purchasePrice) : '',
       notes: item.notes ?? '',
+      care: item.care ?? null,
     });
     setEditing(true);
   }
@@ -96,6 +105,7 @@ export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
       seasons: draft.seasons,
       styles: draft.styles,
       notes: draft.notes || undefined,
+      care: draft.care ?? undefined,
       purchasePrice: Number.isFinite(price) ? price : undefined,
       detection: { ...item.detection, editedByUser: true },
     });
@@ -187,15 +197,78 @@ export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
             {item.styles.length ? item.styles.map((style) => STYLE_LABEL[style]).join(', ') : '—'}
           </Row>
           <Row label="Worn">
-            {item.wearCount > 0
-              ? `${pluralize(item.wearCount, 'time')} · last ${formatRelative(item.lastWornAt).toLowerCase()}`
-              : 'Never'}
+            {item.wearCount === 0
+              ? 'Never'
+              : item.lastWornAt
+                ? `${pluralize(item.wearCount, 'time')} · last ${formatRelative(item.lastWornAt).toLowerCase()}`
+                : pluralize(item.wearCount, 'time')}
           </Row>
           {item.purchasePrice ? (
             <Row label="Cost per wear">
               {(item.purchasePrice / Math.max(1, item.wearCount)).toFixed(2)}
             </Row>
           ) : null}
+        </section>
+
+        <section className="card p-4">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-heading flex items-center gap-2">
+              <Droplets size={16} className="text-[var(--info)]" />
+              Care
+            </h2>
+            {item.care?.source === 'material-default' ? (
+              <Badge tone="info">From the material</Badge>
+            ) : null}
+          </div>
+
+          {item.care ? (
+            <>
+              <ul className="mt-3 space-y-1.5">
+                {[
+                  item.care.wash ? WASH_LABEL[item.care.wash] : null,
+                  item.care.dry ? DRY_LABEL[item.care.dry] : null,
+                  item.care.iron ? IRON_LABEL[item.care.iron] : null,
+                  item.care.bleach ? BLEACH_LABEL[item.care.bleach] : null,
+                ]
+                  .filter((line): line is string => Boolean(line))
+                  .map((line) => (
+                    <li key={line} className="text-[0.9375rem]">
+                      {line}
+                    </li>
+                  ))}
+              </ul>
+
+              {item.care.flags.length ? (
+                <div className="mt-3 space-y-2 border-t border-[var(--border)] pt-3">
+                  {item.care.flags.map((flag) => (
+                    <p key={flag} className="text-[0.875rem] leading-relaxed">
+                      <span className="font-semibold">{FLAG_LABEL[flag]}.</span>{' '}
+                      <span className="text-[var(--text-muted)]">{FLAG_ADVICE[flag]}</span>
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+
+              {item.care.notes ? (
+                <p className="mt-3 border-t border-[var(--border)] pt-3 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
+                  {item.care.notes}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="mt-2 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
+              No label recorded. Add one and the laundry screen will keep this piece out of a wash
+              that would ruin it.
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={startEditing}
+            className="pressable mt-3 text-[0.875rem] font-medium text-[var(--brand)]"
+          >
+            {item.care ? 'Edit care instructions' : 'Add care instructions'}
+          </button>
         </section>
 
         {item.notes ? (

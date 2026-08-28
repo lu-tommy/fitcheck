@@ -1,5 +1,8 @@
 'use client';
 
+import { ChevronDown } from 'lucide-react';
+
+import { careSummary, suggestedCare } from '@/domain/care';
 import { hexForColorName } from '@/domain/color';
 import {
   CATEGORIES,
@@ -15,8 +18,9 @@ import {
 } from '@/domain/taxonomy';
 import { COLOR_NAMES, swatches } from '@/lib/palette';
 import { titleCase } from '@/lib/format';
-import type { Category, Formality, Pattern, Season, Style } from '@/types';
+import type { CareInstructions, Category, Formality, Pattern, Season, Style } from '@/types';
 
+import { CareForm, EMPTY_CARE } from '@/components/closet/CareForm';
 import { Chip } from '@/components/ui/Chip';
 import { Field, Input, Select, Textarea } from '@/components/ui/Field';
 
@@ -35,6 +39,8 @@ export interface ItemDraft {
   styles: Style[];
   purchasePrice: string;
   notes: string;
+  /** Null until someone records the label. Kept out of the required path. */
+  care: CareInstructions | null;
 }
 
 export const EMPTY_DRAFT: ItemDraft = {
@@ -51,6 +57,7 @@ export const EMPTY_DRAFT: ItemDraft = {
   styles: ['casual'],
   purchasePrice: '',
   notes: '',
+  care: null,
 };
 
 export function ItemForm({
@@ -62,6 +69,10 @@ export function ItemForm({
 }) {
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((entry) => entry !== value) : [...list, value];
+
+  // Offered, never applied silently: a guess from the material is only ever a
+  // starting point, and the wearer is the one holding the label.
+  const suggestion = suggestedCare({ category: draft.category, material: draft.material });
 
   return (
     <div className="space-y-5">
@@ -195,6 +206,51 @@ export function ItemForm({
           ))}
         </div>
       </div>
+
+      <details className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+        <summary className="pressable flex cursor-pointer list-none items-center justify-between gap-3">
+          <span>
+            <span className="block text-[0.9375rem] font-medium">Care instructions</span>
+            <span className="mt-0.5 block text-[0.8125rem] text-[var(--text-muted)]">
+              {careSummary(draft.care ?? undefined) ?? 'How to wash it without ruining it'}
+            </span>
+          </span>
+          <ChevronDown size={17} className="shrink-0 text-[var(--text-faint)]" />
+        </summary>
+
+        <div className="mt-4 border-t border-[var(--border)] pt-4">
+          {!draft.care && suggestion ? (
+            <button
+              type="button"
+              onClick={() => onChange({ care: suggestion })}
+              className="pressable mb-4 w-full rounded-2xl border border-dashed border-[var(--border-strong)] px-4 py-3 text-left"
+            >
+              <span className="block text-[0.875rem] font-medium">
+                Use standard {draft.material.trim().toLowerCase() || 'care'} care
+              </span>
+              <span className="mt-0.5 block text-[0.8125rem] text-[var(--text-muted)]">
+                {careSummary(suggestion)}
+              </span>
+            </button>
+          ) : null}
+
+          <CareForm
+            care={draft.care ?? EMPTY_CARE}
+            onChange={(care) => onChange({ care })}
+            suggested={draft.care?.source === 'material-default'}
+          />
+
+          {draft.care ? (
+            <button
+              type="button"
+              onClick={() => onChange({ care: null })}
+              className="pressable mt-4 text-[0.8125rem] text-[var(--text-muted)] underline underline-offset-2"
+            >
+              Clear care instructions
+            </button>
+          ) : null}
+        </div>
+      </details>
 
       <Field label="What it cost" hint="Optional — powers cost-per-wear in your stats.">
         <Input

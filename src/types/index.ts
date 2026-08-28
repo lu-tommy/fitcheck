@@ -105,6 +105,58 @@ export type Style =
 
 export type LaundryStatus = 'clean' | 'dirty' | 'washing';
 
+/* ------------------------------------------------------------------ care -- */
+
+/** The wash symbol on the label, in the order a person would read it. */
+export type WashMethod =
+  | 'machine-cold'
+  | 'machine-warm'
+  | 'machine-hot'
+  | 'hand-wash'
+  | 'dry-clean'
+  | 'do-not-wash';
+
+export type WashCycle = 'normal' | 'permanent-press' | 'delicate';
+
+export type DryMethod =
+  | 'tumble-low'
+  | 'tumble-normal'
+  | 'line-dry'
+  | 'dry-flat'
+  | 'do-not-tumble';
+
+export type IronSetting = 'high' | 'medium' | 'low' | 'steam-only' | 'do-not-iron';
+
+export type BleachRule = 'any' | 'non-chlorine' | 'do-not-bleach';
+
+/**
+ * The short warnings that actually ruin clothes — the things you only learn
+ * once, expensively. Kept as a fixed list rather than free text so the laundry
+ * planner can reason about them.
+ */
+export type CareFlag =
+  | 'bleeds'
+  | 'shrinks'
+  | 'wash-separately'
+  | 'wash-inside-out'
+  | 'no-fabric-softener'
+  | 'use-a-mesh-bag'
+  | 'reshape-while-damp'
+  | 'do-not-wring';
+
+export interface CareInstructions {
+  wash?: WashMethod;
+  cycle?: WashCycle;
+  dry?: DryMethod;
+  iron?: IronSetting;
+  bleach?: BleachRule;
+  flags: CareFlag[];
+  /** Anything the label says that the fields above cannot hold. */
+  notes?: string;
+  /** Where these came from, so a guess can be shown as a guess. */
+  source: 'label' | 'material-default' | 'manual';
+}
+
 export interface ClothingItem {
   id: string;
   /**
@@ -131,6 +183,8 @@ export interface ClothingItem {
   wearCount: number;
   lastWornAt?: string;
   notes?: string;
+  /** How to wash it without ruining it. Undefined means nobody has said. */
+  care?: CareInstructions;
   purchasePrice?: number;
   createdAt: string;
   updatedAt: string;
@@ -258,6 +312,10 @@ export interface Preferences {
   };
   /** How new photos get their background removed. See lib/backgroundRemoval. */
   backgroundRemoval: BackgroundRemovalMode;
+  /** ISO timestamp of the last successful export. Drives the backup reminder. */
+  lastBackupAt?: string;
+  /** Set once the install card has been dismissed, so it asks only once. */
+  installPromptDismissed?: boolean;
 }
 
 /**

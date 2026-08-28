@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
 import { OutfitPill } from '@/components/outfit/OutfitCard';
+import { SafetyCard } from '@/components/SafetyCard';
 import { OutfitStack } from '@/components/outfit/OutfitStack';
 import { WeatherCard } from '@/components/WeatherCard';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -101,6 +102,7 @@ export default function HomePage() {
       </header>
 
       <div className="space-y-6 px-5">
+        <SafetyCard />
         <WeatherCard />
 
         {!hydrated ? (

@@ -54,16 +54,23 @@ export async function processPhoto(file: Blob): Promise<ProcessedImage> {
 }
 
 /**
- * Sample the middle of the frame, where the garment almost always is, and take
- * the most common colour after quantising. Pixels that are near-transparent or
- * that look like a plain wall (very light and desaturated) are skipped, which
- * is what stops every photo coming back "white".
+ * Find the garment's colour in a photo.
+ *
+ * Two passes. The first reads the outer ring of the frame, which is almost
+ * always backdrop — a wall, a floor, a bedsheet. The second bins the middle of
+ * the frame and throws away anything that matches that backdrop, so a pair of
+ * shoes photographed on a duvet does not come back the colour of the duvet.
+ *
+ * If discarding the backdrop leaves almost nothing, the garment probably fills
+ * the frame and *is* that colour, so the filter is dropped rather than trusted.
  */
 export function dominantColor(
   context: CanvasRenderingContext2D,
   width: number,
   height: number,
 ): { hex: string; name: string } {
+  const backdrop = edgeColor(context, width, height);
+
   const inset = 0.18;
   const x = Math.floor(width * inset);
   const y = Math.floor(height * inset);
@@ -71,42 +78,96 @@ export function dominantColor(
   const h = Math.max(1, Math.floor(height * (1 - inset * 2)));
   const { data } = context.getImageData(x, y, w, h);
 
-  const buckets = new Map<string, { count: number; r: number; g: number; b: number }>();
-  let sampled = 0;
+  const collect = (skipBackdrop: boolean) => {
+    const buckets = new Map<string, { count: number; r: number; g: number; b: number }>();
+    let sampled = 0;
 
-  for (let i = 0; i < data.length; i += 4 * 7) {
-    const alpha = data[i + 3];
-    if (alpha < 200) continue;
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const lightness = (max + min) / 2;
-    const saturation = max === min ? 0 : (max - min) / (255 - Math.abs(max + min - 255));
-    // Skip the backdrop: very bright and grey, or almost black shadow.
-    if (lightness > 235 && saturation < 0.12) continue;
-    if (lightness < 18) continue;
+    for (let i = 0; i < data.length; i += 4 * 7) {
+      if (data[i + 3] < 200) continue;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
 
-    const key = `${r >> 4}-${g >> 4}-${b >> 4}`;
-    const bucket = buckets.get(key) ?? { count: 0, r: 0, g: 0, b: 0 };
-    bucket.count += 1;
-    bucket.r += r;
-    bucket.g += g;
-    bucket.b += b;
-    buckets.set(key, bucket);
-    sampled += 1;
-  }
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const lightness = (max + min) / 2;
+      const saturation = max === min ? 0 : (max - min) / (255 - Math.abs(max + min - 255));
+      // Blown-out highlights and deep shadow describe the lighting, not the cloth.
+      if (lightness > 235 && saturation < 0.12) continue;
+      if (lightness < 18) continue;
 
-  if (!sampled) return { hex: swatches.grey, name: 'grey' };
+      if (skipBackdrop && backdrop && distance(r, g, b, backdrop) < BACKDROP_TOLERANCE) continue;
 
-  const best = [...buckets.values()].sort((a, b) => b.count - a.count)[0];
+      const key = `${r >> 4}-${g >> 4}-${b >> 4}`;
+      const bucket = buckets.get(key) ?? { count: 0, r: 0, g: 0, b: 0 };
+      bucket.count += 1;
+      bucket.r += r;
+      bucket.g += g;
+      bucket.b += b;
+      buckets.set(key, bucket);
+      sampled += 1;
+    }
+    return { buckets, sampled };
+  };
+
+  const filtered = collect(true);
+  const total = collect(false);
+
+  // Under a twentieth of the frame left means the "backdrop" was the garment.
+  const chosen =
+    filtered.sampled > Math.max(24, total.sampled * 0.05) ? filtered : total;
+
+  if (!chosen.sampled) return { hex: swatches.grey, name: 'grey' };
+
+  const best = [...chosen.buckets.values()].sort((a, b) => b.count - a.count)[0];
   const hex = rgbToHex(
     Math.round(best.r / best.count),
     Math.round(best.g / best.count),
     Math.round(best.b / best.count),
   );
   return { hex, name: nearestSwatchName(hex) };
+}
+
+/** How far a colour can sit from the backdrop and still count as backdrop. */
+const BACKDROP_TOLERANCE = 46;
+
+function distance(r: number, g: number, b: number, to: [number, number, number]): number {
+  return Math.sqrt((r - to[0]) ** 2 + (g - to[1]) ** 2 + (b - to[2]) ** 2);
+}
+
+/** The median colour of the frame's outer ring — a good guess at the backdrop. */
+function edgeColor(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): [number, number, number] | null {
+  const band = Math.max(2, Math.round(Math.min(width, height) * 0.05));
+  const reds: number[] = [];
+  const greens: number[] = [];
+  const blues: number[] = [];
+
+  const scan = (sx: number, sy: number, sw: number, sh: number) => {
+    if (sw <= 0 || sh <= 0) return;
+    const { data } = context.getImageData(sx, sy, sw, sh);
+    for (let i = 0; i < data.length; i += 4 * 5) {
+      if (data[i + 3] < 200) continue;
+      reds.push(data[i]);
+      greens.push(data[i + 1]);
+      blues.push(data[i + 2]);
+    }
+  };
+
+  scan(0, 0, width, band);
+  scan(0, height - band, width, band);
+  scan(0, band, band, Math.max(0, height - band * 2));
+  scan(width - band, band, band, Math.max(0, height - band * 2));
+
+  if (!reds.length) return null;
+  const median = (values: number[]) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+  };
+  return [median(reds), median(greens), median(blues)];
 }
 
 export function rgbToHex(r: number, g: number, b: number): string {

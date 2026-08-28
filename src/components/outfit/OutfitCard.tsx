@@ -36,9 +36,11 @@ export function OutfitCard({
           {outfit.occasion ?? `${pluralize(items.length, 'piece')}`}
         </p>
         <p className="mt-1 text-[0.75rem] text-[var(--text-faint)]">
-          {outfit.timesWorn > 0
-            ? `Worn ${pluralize(outfit.timesWorn, 'time')} · last ${formatRelative(outfit.lastWornAt).toLowerCase()}`
-            : 'Never worn'}
+          {outfit.timesWorn === 0
+            ? 'Never worn'
+            : outfit.lastWornAt
+              ? `Worn ${pluralize(outfit.timesWorn, 'time')} · last ${formatRelative(outfit.lastWornAt).toLowerCase()}`
+              : `Worn ${pluralize(outfit.timesWorn, 'time')}`}
         </p>
       </div>
     </Link>
