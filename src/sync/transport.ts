@@ -11,6 +11,16 @@ import type { SyncedStore, Tombstone } from '@/types';
  * not come back, and that an interrupted run leaves nothing broken.
  */
 export interface SyncTransport {
+  /**
+   * Who the server believes is signed in.
+   *
+   * The engine trusts this over anything the client thinks, because the client
+   * can be wrong: a cached identity from a previous session, a cookie that has
+   * since changed. Getting this wrong once uploaded one person's wardrobe into
+   * another person's account, so identity is now established at the source.
+   */
+  identify(): Promise<string>;
+
   /** Records changed after `since` (a server-side cursor, in milliseconds). */
   fetchRecords(
     store: SyncedStore,

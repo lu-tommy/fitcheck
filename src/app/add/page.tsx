@@ -11,7 +11,6 @@ import { Sheet } from '@/components/ui/Sheet';
 import { hexForColorName } from '@/domain/color';
 import { categoryLabel } from '@/domain/taxonomy';
 import { putPhoto } from '@/db';
-import { tagPhoto } from '@/lib/ai';
 import { removeBackground } from '@/lib/backgroundRemoval';
 import { cropToBlob, type CropBox } from '@/lib/crop';
 import { cn } from '@/lib/cn';
@@ -104,26 +103,6 @@ export default function AddPage() {
             }
           }
 
-          const tagged = await tagPhoto(processed.blob);
-          if (tagged) {
-            patch(entry.key, {
-              taggedByAi: true,
-              draft: {
-                ...draft,
-                name: tagged.name,
-                category: tagged.category,
-                primaryColor: tagged.primaryColor || draft.primaryColor,
-                primaryColorHex: hexForColorName(tagged.primaryColor || draft.primaryColor),
-                secondaryColors: tagged.secondaryColors ?? [],
-                pattern: tagged.pattern,
-                material: tagged.material ?? '',
-                brand: tagged.brand ?? '',
-                formality: tagged.formality,
-                seasons: tagged.seasons?.length ? tagged.seasons : draft.seasons,
-                styles: tagged.styles?.length ? tagged.styles : draft.styles,
-              },
-            });
-          }
         } catch (error) {
           patch(entry.key, { stage: 'failed', error: (error as Error).message });
         }
@@ -398,11 +377,9 @@ export default function AddPage() {
                         {categoryLabel(entry.draft.category)} ·{' '}
                         {titleCase(entry.draft.primaryColor)}
                       </p>
-                      {entry.taggedByAi ? (
-                        <span className="mt-1 inline-flex items-center gap-1 text-[0.6875rem] text-[var(--brand)]">
-                          <Sparkles size={11} /> Detected
-                        </span>
-                      ) : null}
+                      <span className="mt-1 inline-flex items-center gap-1 text-[0.6875rem] text-[var(--text-faint)]">
+                        <Sparkles size={11} /> Colour detected
+                      </span>
                     </>
                   )}
                 </div>

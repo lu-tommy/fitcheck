@@ -3,7 +3,7 @@
 import {
   Camera,
   Check,
-  MessageCircleQuestion,
+  Layers,
   Shirt,
   Sparkles,
   Undo2,
@@ -280,12 +280,12 @@ export default function HomePage() {
               Add clothing
             </ButtonLink>
             <ButtonLink
-              href="/stylist"
+              href="/outfits/new"
               variant="secondary"
-              icon={<MessageCircleQuestion size={17} />}
+              icon={<Layers size={17} />}
               className="h-12"
             >
-              Ask stylist
+              Build an outfit
             </ButtonLink>
           </section>
         ) : null}

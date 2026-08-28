@@ -22,6 +22,9 @@ import { makeItem } from './factories';
 interface StoredDoc { record: SyncRecord; store: SyncedStore; stamp: number }
 
 class FakeServer implements SyncTransport {
+  /** Who the server says is signed in — the cookie, in effect. */
+  constructor(private signedInAs = USER) {}
+
   private docs = new Map<string, StoredDoc>();
   private tombstones = new Map<string, { tombstone: Tombstone; stamp: number }>();
   private photos = new Map<string, Blob>();
@@ -29,6 +32,15 @@ class FakeServer implements SyncTransport {
   /** Set to make the next write throw, standing in for a dropped connection. */
   failNextPush = false;
   pushCount = 0;
+
+  async identify() {
+    return this.signedInAs;
+  }
+
+  /** Simulate somebody else signing in on the same device. */
+  signInAs(userId: string) {
+    this.signedInAs = userId;
+  }
 
   private tick(): number {
     this.clock += 1;
@@ -130,8 +142,7 @@ async function restore(snap: Snapshot): Promise<void> {
 }
 
 const USER = 'user-1';
-const sync = (server: FakeServer, mode?: 'merge' | 'pull-only') =>
-  runSync(USER, server, mode);
+const sync = (server: FakeServer, mode?: 'auto' | 'adopt') => runSync(USER, server, mode);
 
 const itemIds = async () => (await readAll('items')).map((item) => item.id).sort();
 
@@ -355,13 +366,100 @@ describe('when things go wrong', () => {
     await sync(server);
 
     // The same device is now signed into a different account.
-    const otherServer = new FakeServer();
-    const report = await runSync('user-2', otherServer, 'pull-only');
+    const otherServer = new FakeServer('user-2');
+    const report = await runSync('user-2', otherServer);
 
     expect(otherServer.itemIds()).toEqual([]);
     expect(report.pushed).toBe(0);
     // And nothing local was destroyed in the process.
     expect(await itemIds()).toEqual(['private-to-a']);
+  });
+
+  /*
+   * The bug this covers shipped and was caught in a browser: the client cached
+   * "you are Tommy" while the session cookie had become Lia's, so the guard
+   * compared Tommy to Tommy, saw no mismatch, and pushed one person's wardrobe
+   * into the other's account. Identity now comes from the server.
+   */
+  it('stops rather than sync when the client and the server disagree', async () => {
+    const server = new FakeServer();
+    await addItem({ id: 'belongs-to-user-1' });
+    await sync(server);
+
+    // Somebody else signs in, but the client still thinks it is user-1.
+    server.signInAs('user-2');
+    await expect(runSync(USER, server)).rejects.toThrow(/Signed in as user-2/);
+
+    // Nothing crossed over, and nothing local was touched.
+    expect(server.itemIds()).toEqual(['belongs-to-user-1']);
+    expect(await itemIds()).toEqual(['belongs-to-user-1']);
+  });
+
+  it('holds back a wardrobe that belongs to another account', async () => {
+    const first = new FakeServer('user-1');
+    await addItem({ id: 'user-1-only' });
+    await sync(first);
+
+    // Same device, second account. The engine must not push what it holds.
+    const second = new FakeServer('user-2');
+    const report = await runSync('user-2', second);
+
+    expect(report.heldBackLocalData).toBe(true);
+    expect(second.itemIds()).toEqual([]);
+    expect(await itemIds()).toEqual(['user-1-only']);
+  });
+
+  /*
+   * This one shipped and was caught in a browser. The first pull-only run
+   * recorded the new account id, so the next run — triggered by the writes the
+   * pull itself made — saw matching ids, decided the other person's clothes
+   * belonged to this account, and uploaded all of them.
+   */
+  it('keeps holding it back on every later sync, not just the first', async () => {
+    const first = new FakeServer('user-1');
+    await addItem({ id: 'user-1-only' });
+    await sync(first);
+
+    const second = new FakeServer('user-2');
+    await runSync('user-2', second);
+    await runSync('user-2', second);
+    await runSync('user-2', second);
+
+    expect(second.itemIds()).toEqual([]);
+  });
+
+  it('and still holds it back after the other account’s items arrive', async () => {
+    const first = new FakeServer('user-1');
+    await addItem({ id: 'user-1-only' });
+    await sync(first);
+
+    // user-2 has their own wardrobe waiting on the server.
+    const second = new FakeServer('user-2');
+    await second.pushRecords('items', [{ id: 'user-2-only', updatedAt: '2026-01-01T00:00:00.000Z' }]);
+
+    await runSync('user-2', second);
+    await runSync('user-2', second);
+
+    // Both are on the device now, but only user-2's is in user-2's account.
+    expect((await itemIds()).sort()).toEqual(['user-1-only', 'user-2-only']);
+    expect(second.itemIds()).toEqual(['user-2-only']);
+  });
+
+  it('uploads it only when somebody deliberately adopts it', async () => {
+    const first = new FakeServer('user-1');
+    await addItem({ id: 'was-user-1s' });
+    await sync(first);
+
+    const second = new FakeServer('user-2');
+    await runSync('user-2', second);
+    expect(second.itemIds()).toEqual([]);
+
+    await runSync('user-2', second, 'adopt');
+    expect(second.itemIds()).toEqual(['was-user-1s']);
+
+    // And the warning does not come back afterwards.
+    const report = await runSync('user-2', second);
+    expect(report.heldBackLocalData).toBe(false);
   });
 });
 

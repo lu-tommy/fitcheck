@@ -4,6 +4,7 @@ Photograph the clothes you already own, and get outfits built from that closet
 and nothing else. No shopping suggestions dressed up as styling.
 
 Next.js 16 · React 19 · TypeScript · Tailwind v4 · Zustand · IndexedDB.
+No AI, no API keys, no third-party services.
 
 ---
 
@@ -16,10 +17,9 @@ npm test           # 90 tests over the domain logic
 npm run typecheck
 ```
 
-**No keys are required.** With nothing configured everything works: adding
-clothes, generating outfits, planning a week, packing a trip, laundry, stats and
-the weather all run locally. Adding a key (see `.env.example`) upgrades tagging
-and styling from rule-based to Claude-powered.
+**Nothing needs configuring to run it.** Adding clothes, generating outfits,
+planning a week, packing a trip, laundry, stats and weather all work out of the
+box. `.env.local` only adds accounts and backup — see below.
 
 To look around before photographing anything, tap **try a demo wardrobe** on the
 home screen (or **You → Load a demo wardrobe**). Demo pieces have no photo and
@@ -32,39 +32,59 @@ it prints. It installs to the home screen as a PWA.
 
 ## What runs where
 
-| Feature | Without a key | With a key |
-|---|---|---|
-| Tagging a photo | Colour is detected on-device; you fill in the rest | Claude reads the photo and fills the fields in |
-| Outfit generation | On-device scoring engine, with written reasoning | Claude, grounded in your closet |
-| Stylist | Answers by running the engine and narrating it | Claude, answering your actual question |
-| Packing lists | Heuristic re-wear planner | Claude |
-| Wishlist gap analysis | Unavailable | Claude |
-| Background removal | On-device flood fill (plain backgrounds) | Cut-out provider, if configured |
-| Weather | Works — Open-Meteo, no key needed | — |
-
-The home screen's daily suggestion **always** uses the on-device engine, even
-when a key is present. Opening the app should not cost money; the Generate
-screen is where a considered suggestion belongs.
+There is no AI in this app and no API key to buy. Outfits, packing lists,
+colour reasoning and the wash planner all come from rules in `src/domain`, which
+run instantly, work offline, and can be read and argued with. Weather comes from
+Open-Meteo, which needs no key either.
 
 ---
 
-## Accounts and backup
+## Accounts on your own server
 
-Sign in and the wardrobe is copied to your own Firebase project — a lost phone
-stops being a fresh start, and the same account works on a phone and a tablet.
-**The app works fully without one**, signed out and offline; an account is
-additive, not a wall in front of the door.
+Sign in and the wardrobe is copied to a folder on your own machine — a lost
+phone stops being a fresh start, and the same account works on a phone and a
+tablet. There is no third party involved and nothing to pay for. **The app works
+fully without an account**, signed out and offline; an account is additive, not
+a wall in front of the door.
 
-Setup is about ten minutes and the steps are in `.env.example`. In short: create
-a Firebase project, enable Email/Password sign-in, create Firestore and Storage,
-paste the web config into `.env.local`, then
-`firebase deploy --only firestore:rules,storage`.
+### Setting it up
 
-**Deploy the rules.** `firestore.rules` and `storage.rules` are what make a
-wardrobe private: they allow a signed-in user to read and write nothing but
-documents under their own uid, and deny everything else by default. The Firebase
-web config in `.env.local` is not a secret — it is public by design — so the
-rules are the whole of the security model.
+```sh
+cp .env.example .env.local
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"   # OUTFITAI_SECRET
+npm run add-user -- lia      # prints a name:salt:hash line for OUTFITAI_USERS
+npm run add-user -- tommy    # entries are separated by ;
+```
+
+Passwords are never stored — only a scrypt hash and its salt — so `.env.local`
+does not hand anyone a way in if it leaks. Sessions are an httpOnly cookie
+signed with `OUTFITAI_SECRET`, so page scripts cannot read them and nobody can
+forge one. Ten wrong guesses for a name locks it out for ten minutes.
+
+### Running it on a NAS
+
+```sh
+echo "OUTFITAI_SECRET=..." > .env
+echo "OUTFITAI_USERS=..." >> .env
+docker compose up -d --build
+```
+
+The container listens on `127.0.0.1:3210` only, so nginx is the only way in.
+`deploy/nginx-fitcheck.conf` is a ready site config for
+`fitcheck.tommyluhome.duckdns.org` — it terminates TLS, forwards
+`X-Forwarded-For` (the login rate limiter needs it), allows 32 MB uploads for
+photo imports, and asks search engines to stay away.
+
+Everything lives in `./data`, one folder per person:
+
+```
+data/users/lia/wardrobe.json     her clothes, outfits, plans — readable JSON
+data/users/lia/photos/           one file per photo
+```
+
+Back that folder up and nothing else matters. Every write goes to a temporary
+file and is renamed over the real one, so a power cut leaves the old file or the
+new one, never a half-written one.
 
 ### How sync behaves
 
@@ -88,10 +108,23 @@ other device still holds the record, pushes it back, and the thing you deleted
 reappears. Conflicts are resolved by taking the newest fact for each id, where a
 deletion is a fact with a timestamp exactly like an edit.
 
-Signing into a *different* account on a device that already holds a wardrobe
-switches sync to pull-only and says so, so one person's clothes can never be
-uploaded into another person's account. Nothing local is deleted; there is a
-button to merge it deliberately.
+### Two people, one device
+
+If somebody signs in on a device that already holds another account's wardrobe,
+sync goes pull-only and says so: nothing local is uploaded and nothing is
+deleted, and there are two buttons — keep only mine, or merge it in.
+
+Two bugs in that path were found by driving the real app, and both are now
+covered by tests:
+
+- The client cached "you are Tommy" in localStorage while the session cookie had
+  become Lia's, so the guard compared Tommy to Tommy, saw no mismatch, and
+  uploaded one person's wardrobe into the other's account. **Identity now comes
+  from the server**, and the engine refuses to run if the two disagree.
+- The guard was a one-shot: the first pull-only run recorded the new account id,
+  so the next run — triggered by the writes the pull itself made — saw matching
+  ids and uploaded everything. **The flag is now sticky** until somebody
+  deliberately resolves it.
 
 ## Where your data lives
 
@@ -149,11 +182,12 @@ src/
                  leaves the app unable to open at all
   sync/          merge.ts holds every rule about what wins, as pure functions;
                  engine.ts orchestrates; transport.ts is the seam that lets the
-                 whole thing be tested without Firebase
+                 whole thing be tested without a server
   store/         Zustand stores, one per concern, hydrated once by AppShell
   lib/           Image processing, background removal, weather, backup, the
                  client half of the AI layer
-  server/        The Anthropic client. The key never leaves this directory.
+  server/        Accounts, sessions and the wardrobe files on disk. Nothing
+                 here is ever bundled into the browser.
   app/           Routes. Every screen is a client component, because the data
                  lives in the browser.
   components/    ui/ primitives, then closet/, outfit/, stats/

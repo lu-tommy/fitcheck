@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Archive,
   BarChart3,
   CalendarDays,
   ChevronRight,
@@ -9,7 +10,6 @@ import {
   Heart,
   LogOut,
   Luggage,
-  MessageCircleQuestion,
   Scissors,
   Upload,
   UserRound,
@@ -29,10 +29,8 @@ import { Sheet } from '@/components/ui/Sheet';
 import { STYLES, STYLE_LABEL } from '@/domain/taxonomy';
 import { demoWardrobe } from '@/domain/seed';
 import { clearAll, estimateUsage } from '@/db';
-import { aiConfigured } from '@/lib/ai';
 import { BACKUP_STALE_DAYS, daysSinceBackup, importBackup, runBackup } from '@/lib/backup';
 import { persistenceState, type PersistenceState } from '@/lib/persistence';
-import { firebaseReady } from '@/sync/firebase';
 import { useAuth } from '@/store/auth';
 import { COLOR_NAMES, swatches } from '@/lib/palette';
 import { titleCase, pluralize } from '@/lib/format';
@@ -47,19 +45,18 @@ const LINKS = [
   { href: '/packing', label: 'Packing', hint: 'Build a suitcase', icon: Luggage },
   { href: '/laundry', label: 'Laundry', hint: 'What is clean', icon: WashingMachine },
   { href: '/stats', label: 'Statistics', hint: 'What you actually wear', icon: BarChart3 },
-  { href: '/wishlist', label: 'Wishlist', hint: 'Gaps worth filling', icon: Heart },
-  { href: '/stylist', label: 'Stylist', hint: 'Ask about your closet', icon: MessageCircleQuestion },
+  { href: '/wishlist', label: 'Wishlist', hint: 'Things you are thinking of buying', icon: Heart },
+  { href: '/closet/archive', label: 'Archive', hint: 'Kept, but out of rotation', icon: Archive },
 ] as const;
 
 export default function ProfilePage() {
   const { items, addItems } = useCloset();
   const outfits = useOutfits((state) => state.outfits);
   const { preferences, update, setTheme } = usePreferences();
-  const { status: authStatus, email: accountEmail, leave } = useAuth();
+  const { status: authStatus, username: accountName, leave } = useAuth();
 
   const [usage, setUsage] = useState<{ usage: number; quota: number } | null>(null);
   const [persisted, setPersisted] = useState<PersistenceState>('unknown');
-  const [ai, setAi] = useState<boolean | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [working, setWorking] = useState(false);
   const importInput = useRef<HTMLInputElement>(null);
@@ -67,7 +64,6 @@ export default function ProfilePage() {
   useEffect(() => {
     void estimateUsage().then(setUsage);
     void persistenceState().then(setPersisted);
-    void aiConfigured().then(setAi);
   }, [items.length]);
 
   const backupAge = daysSinceBackup(preferences.lastBackupAt);
@@ -105,7 +101,7 @@ export default function ProfilePage() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[0.9375rem] font-medium">
-                    {accountEmail}
+                    {accountName}
                   </span>
                   <span className="block text-[0.8125rem] text-[var(--text-muted)]">
                     Signed in on this device
@@ -124,7 +120,7 @@ export default function ProfilePage() {
                 </Button>
               </div>
             </div>
-          ) : firebaseReady() ? (
+          ) : authStatus !== 'unconfigured' ? (
             <Link href="/account" className="card pressable flex items-center gap-3 p-4">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
                 <UserRound size={19} />
@@ -146,10 +142,10 @@ export default function ProfilePage() {
                 <CloudOff size={17} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[0.9375rem] font-medium">No backend configured</span>
+                <span className="block text-[0.9375rem] font-medium">No accounts yet</span>
                 <span className="mt-0.5 block text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
-                  Accounts need a Firebase project. Until then the export below is the only copy
-                  that survives this browser.
+                  Nobody has been added on the server yet. Until then the export below is the
+                  only copy that survives this browser.
                 </span>
               </span>
             </div>
@@ -274,24 +270,6 @@ export default function ProfilePage() {
               <Scissors size={15} className="mt-0.5 shrink-0" />
               Photos are downscaled to 1400px before they are stored, so a large closet still fits
               in the browser.
-            </p>
-          </div>
-        </section>
-
-        <section>
-          <SectionHeader title="Intelligence" />
-          <div className="card p-4">
-            <p className="text-[0.9375rem] font-medium">
-              {ai === null
-                ? 'Checking…'
-                : ai
-                  ? 'Claude is connected'
-                  : 'Running on the built-in engine'}
-            </p>
-            <p className="mt-1.5 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
-              {ai
-                ? 'Photo tagging, outfit generation, packing and the stylist all go through Claude on the server. Your closet is sent as text — never your photos, except when tagging one.'
-                : 'Everything works without a key: outfits, packing and stats come from the on-device engine. Set ANTHROPIC_API_KEY on the server to upgrade tagging and styling.'}
             </p>
           </div>
         </section>

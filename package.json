@@ -7,18 +7,16 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "add-user": "node scripts/add-user.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.122.0",
     "date-fns": "^4.4.0",
-    "firebase": "^12.18.0",
     "idb": "^8.0.3",
     "lucide-react": "^1.35.0",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "^4.4.3",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

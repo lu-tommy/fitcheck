@@ -12,8 +12,17 @@ import { useSync } from '@/store/sync';
 /** The honest answer to "is her stuff safe right now?". */
 export function SyncStatus({ className }: { className?: string }) {
   const userId = useAuth((state) => state.userId);
-  const { status, lastSyncedAt, lastReport, error, foreignWardrobe, sync, adoptLocalWardrobe } =
-    useSync();
+  const {
+    status,
+    lastSyncedAt,
+    lastReport,
+    error,
+    foreignWardrobe,
+    sync,
+    adoptLocalWardrobe,
+    discardForeignWardrobe,
+  } = useSync();
+  const [resolving, setResolving] = useState(false);
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
@@ -78,15 +87,40 @@ export function SyncStatus({ className }: { className?: string }) {
       </div>
 
       {foreignWardrobe ? (
-        <div className="mt-3 space-y-2 rounded-2xl bg-[var(--warning-soft)] p-3">
+        <div className="mt-3 space-y-2.5 rounded-2xl bg-[var(--warning-soft)] p-3">
           <p className="flex items-start gap-2 text-[0.8125rem] leading-relaxed text-[var(--warning)]">
             <TriangleAlert size={15} className="mt-0.5 shrink-0" />
-            This device still holds a wardrobe from a different account, so nothing local is being
-            uploaded. Nothing has been deleted.
+            Somebody else&rsquo;s wardrobe is still on this device, mixed in with yours. None of it
+            has been uploaded to your account, and none of it has been deleted.
           </p>
-          <Button size="sm" full onClick={() => void adoptLocalWardrobe(userId)}>
-            Merge it into this account
+          <Button
+            size="sm"
+            full
+            disabled={resolving}
+            onClick={async () => {
+              setResolving(true);
+              await discardForeignWardrobe(userId);
+              setResolving(false);
+            }}
+          >
+            {resolving ? 'Working…' : 'Show only my wardrobe'}
           </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            full
+            disabled={resolving}
+            onClick={async () => {
+              setResolving(true);
+              await adoptLocalWardrobe(userId);
+              setResolving(false);
+            }}
+          >
+            It is all mine — merge it in
+          </Button>
+          <p className="text-[0.75rem] leading-relaxed text-[var(--warning)]">
+            Clearing is safe: their wardrobe is already saved under their own account.
+          </p>
         </div>
       ) : null}
 

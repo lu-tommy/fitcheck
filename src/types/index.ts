@@ -458,6 +458,15 @@ export interface SyncState {
   lastPulledAt?: number;
   lastSyncedAt?: string;
   lastError?: string;
+  /**
+   * Set when this device holds a wardrobe belonging to a different account.
+   *
+   * Sticky on purpose. It cannot be re-derived each run by comparing account
+   * ids, because the first pull-only run records the new id and the next run
+   * would then see no mismatch and upload the other person's clothes. It stays
+   * set until somebody deliberately merges or clears.
+   */
+  foreignWardrobe?: boolean;
   /** Photo ids known to exist in cloud storage, so uploads are not repeated. */
   uploadedPhotoIds: string[];
 }

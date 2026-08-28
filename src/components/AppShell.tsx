@@ -15,7 +15,6 @@ import { useCloset } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
 import { usePlanner } from '@/store/planner';
 import { usePreferences } from '@/store/preferences';
-import { useStylist } from '@/store/stylist';
 import { useWeather } from '@/store/weather';
 import { useWishlist } from '@/store/wishlist';
 
@@ -34,6 +33,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const immersive = IMMERSIVE.some((route) => pathname.startsWith(route));
   const userId = useAuth((state) => state.userId);
+  const confirmed = useAuth((state) => state.confirmed);
 
   // One hydration pass for the whole app. Each store guards against a second
   // run, so mounting this once at the root is enough.
@@ -48,7 +48,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     void useOutfits.getState().hydrate();
     void usePlanner.getState().hydrate();
     void useWishlist.getState().hydrate();
-    void useStylist.getState().hydrate();
     void useWeather.getState().hydrate();
     useAuth.getState().watch();
 
@@ -63,12 +62,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Sync only runs for a signed-in account; signed out, the app is exactly the
   // local-first app it was before, which is what keeps it usable on day one.
   useEffect(() => {
-    if (!userId) {
+    // Never sync on a cached identity — see the note in store/auth.
+    if (!userId || !confirmed) {
       useSync.getState().reset();
       return;
     }
     return startSyncSchedule(userId);
-  }, [userId]);
+  }, [userId, confirmed]);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">

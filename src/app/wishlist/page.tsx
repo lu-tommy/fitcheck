@@ -6,11 +6,10 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Chip';
-import { EmptyState, Spinner } from '@/components/ui/Feedback';
+import { EmptyState } from '@/components/ui/Feedback';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
 import { CATEGORIES, categoryLabel } from '@/domain/taxonomy';
-import { aiConfigured, suggestWishlist } from '@/lib/ai';
 import { cn } from '@/lib/cn';
 import { titleCase } from '@/lib/format';
 import { useActiveItems } from '@/store/closet';
@@ -29,34 +28,6 @@ export default function WishlistPage() {
   const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
   const [url, setUrl] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function findGaps() {
-    if (!items.length) return;
-    setBusy(true);
-    const configured = await aiConfigured();
-    if (!configured) {
-      setBusy(false);
-      toast('Gap analysis needs an Anthropic API key on the server', { tone: 'danger' });
-      return;
-    }
-    const suggestions = await suggestWishlist(items);
-    setBusy(false);
-    if (!suggestions?.length) {
-      toast('No suggestions came back', { tone: 'danger' });
-      return;
-    }
-    for (const suggestion of suggestions) {
-      await add({
-        name: suggestion.name,
-        category: suggestion.category,
-        colorName: suggestion.colorName,
-        reason: suggestion.reason,
-        source: 'ai',
-      });
-    }
-    toast(`Added ${suggestions.length} suggestions`, { tone: 'success' });
-  }
 
   const open = wishes.filter((wish) => !wish.purchased);
   const bought = wishes.filter((wish) => wish.purchased);
@@ -74,16 +45,6 @@ export default function WishlistPage() {
       />
 
       <div className="space-y-5 px-5">
-        <Button
-          variant="secondary"
-          full
-          icon={<Sparkles size={16} />}
-          onClick={findGaps}
-          disabled={busy || !items.length}
-        >
-          {busy ? <Spinner label="Reading your closet" /> : 'Find the gaps in my wardrobe'}
-        </Button>
-
         {!wishes.length ? (
           <EmptyState
             icon={<Heart size={26} />}

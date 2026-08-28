@@ -10,7 +10,7 @@ import { Chip } from '@/components/ui/Chip';
 import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { Field, Input } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
-import { planPacking } from '@/lib/ai';
+import { buildPackingLocally } from '@/domain/packingEngine';
 import { formatTemperatureRange, pluralize } from '@/lib/format';
 import { formatRelative } from '@/lib/date';
 import { useActiveItems } from '@/store/closet';
@@ -48,7 +48,7 @@ export default function PackingPage() {
     if (!destination.trim() || !items.length) return;
     setBusy(true);
     const dayCount = Math.max(1, Math.min(30, Number.parseInt(days, 10) || 1));
-    const result = await planPacking(
+    const result = buildPackingLocally(
       {
         destination: destination.trim(),
         days: dayCount,

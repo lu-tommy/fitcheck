@@ -46,12 +46,20 @@ export const SYNCED_STORES: SyncedStore[] = [
 ];
 
 export type SyncMode =
-  /** Normal: local changes go up, remote changes come down. */
-  | 'merge'
-  /** This device holds another account's wardrobe — pull only, push nothing. */
-  | 'pull-only';
+  /**
+   * The normal path. Changes go both ways, unless this device is known to hold
+   * another account's wardrobe — in which case nothing local is uploaded.
+   */
+  | 'auto'
+  /**
+   * Deliberately claim the wardrobe on this device for the account that is
+   * signed in. Only ever reached from a button the person pressed.
+   */
+  | 'adopt';
 
 export interface SyncReport {
+  /** True when local data was held back because it belongs to another account. */
+  heldBackLocalData: boolean;
   pulled: number;
   pushed: number;
   deletedLocally: number;
@@ -66,13 +74,31 @@ export async function readSyncState(): Promise<SyncState> {
   return (await readMeta('sync')) ?? EMPTY_STATE;
 }
 
+/** Thrown when the caller and the server disagree about who is signed in. */
+export class IdentityMismatch extends Error {
+  constructor(readonly expected: string, readonly actual: string) {
+    super(`Signed in as ${actual}, not ${expected}`);
+    this.name = 'IdentityMismatch';
+  }
+}
+
 export async function runSync(
-  userId: string,
+  expectedUserId: string,
   transport: SyncTransport,
-  mode: SyncMode = 'merge',
+  mode: SyncMode = 'auto',
 ): Promise<SyncReport> {
   const started = Date.now();
+
+  /*
+   * Establish identity at the server before touching anything. The caller's
+   * idea of who is signed in comes from a cache that can be stale, and acting
+   * on a stale one is how one person's wardrobe ends up in another person's
+   * account. Everything below uses the server's answer.
+   */
+  const userId = await transport.identify();
+  if (userId !== expectedUserId) throw new IdentityMismatch(expectedUserId, userId);
   const report: SyncReport = {
+    heldBackLocalData: false,
     pulled: 0,
     pushed: 0,
     deletedLocally: 0,
@@ -82,8 +108,19 @@ export async function runSync(
   };
 
   const state = await readSyncState();
-  // A different account on this device makes the saved cursors meaningless.
-  const differentAccount = Boolean(state.userId && state.userId !== userId);
+
+  /*
+   * Is this device carrying somebody else's clothes? True if the last sync was
+   * for another account, or if a previous run already found that and said so.
+   * The second half matters: a pull-only run records the new account id, so
+   * without the sticky flag the very next run would see matching ids, decide
+   * everything local belongs to this account, and upload it.
+   */
+  const differentAccount =
+    Boolean(state.userId && state.userId !== userId) || Boolean(state.foreignWardrobe);
+  const holdBackLocalData = differentAccount && mode !== 'adopt';
+
+  // Another account's cursor means nothing here; re-read from the beginning.
   const since = differentAccount ? 0 : (state.lastPulledAt ?? 0);
 
   const localTombstones = await readTombstones();
@@ -103,7 +140,7 @@ export async function runSync(
       remoteTombstones: remote.tombstones,
     });
 
-    if (mode === 'pull-only') {
+    if (holdBackLocalData) {
       // Nothing local may leave this device: it belongs to another account.
       // Local deletions are held back too — they were somebody else's decision.
       plan.push.length = 0;
@@ -150,7 +187,7 @@ export async function runSync(
 
   const photoPlan = planPhotoSync({ referencedIds, localIds, remoteIds });
 
-  if (mode !== 'pull-only') {
+  if (!holdBackLocalData) {
     for (const id of photoPlan.upload) {
       const database = await db();
       const photo = await database.get('photos', id);
@@ -195,9 +232,12 @@ export async function runSync(
     lastPulledAt: newestStamp,
     lastPushedAt: nowIso(),
     lastSyncedAt: nowIso(),
+    // Adopting resolves it; anything else leaves the warning standing.
+    foreignWardrobe: mode === 'adopt' ? false : holdBackLocalData,
     uploadedPhotoIds: [],
   });
 
+  report.heldBackLocalData = holdBackLocalData;
   report.ms = Date.now() - started;
   return report;
 }

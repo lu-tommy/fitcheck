@@ -9,11 +9,12 @@ import { OutfitCollage } from '@/components/outfit/OutfitCollage';
 import { OutfitStack } from '@/components/outfit/OutfitStack';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, ButtonLink } from '@/components/ui/Button';
-import { Badge, Chip } from '@/components/ui/Chip';
+import { Chip } from '@/components/ui/Chip';
 import { EmptyState, SectionHeader, Spinner } from '@/components/ui/Feedback';
 import { Field, Select, Textarea } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
-import { analyzeHarmony, hexForColorName } from '@/domain/color';
+import { analyzeHarmony } from '@/domain/color';
+import { buildOutfitLocally } from '@/domain/outfitEngine';
 import {
   FORMALITY_LABEL,
   FORMALITY_ORDER,
@@ -23,7 +24,6 @@ import {
   STYLE_LABEL,
   slotOf,
 } from '@/domain/taxonomy';
-import { generateOutfit, type AiSource } from '@/lib/ai';
 import { renderComparisonImage, shareImage } from '@/lib/outfitImage';
 import { COLOR_NAMES, swatches } from '@/lib/palette';
 import { formatTemperatureLong, titleCase } from '@/lib/format';
@@ -63,7 +63,7 @@ function Generator() {
   const [picker, setPicker] = useState<'include' | 'exclude' | null>(null);
 
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ outfit: GeneratedOutfit; source: AiSource } | null>(null);
+  const [result, setResult] = useState<{ outfit: GeneratedOutfit } | null>(null);
   const [rival, setRival] = useState<GeneratedOutfit | null>(null);
   const [sharing, setSharing] = useState(false);
 
@@ -89,7 +89,7 @@ function Generator() {
   async function run() {
     if (!items.length) return;
     setBusy(true);
-    const generated = await generateOutfit({
+    const generated = { outfit: buildOutfitLocally({
       request: {
         prompt: prompt.trim() || occasion || 'Something good for today',
         occasion,
@@ -107,7 +107,7 @@ function Generator() {
       preferredStyles: preferences.preferredStyles,
       avoidColors: preferences.avoidColors,
       units: preferences.units,
-    });
+    }) };
     setResult(generated);
     setRival(null);
     setBusy(false);
@@ -122,7 +122,7 @@ function Generator() {
     if (!result) return;
     setBusy(true);
     const pool = cleanOnly ? items.filter((item) => item.laundry === 'clean') : items;
-    const generated = await generateOutfit({
+    const generated = { outfit: buildOutfitLocally({
       request: {
         prompt: prompt.trim() || occasion || 'Something good for today',
         occasion,
@@ -140,7 +140,7 @@ function Generator() {
       preferredStyles: preferences.preferredStyles,
       avoidColors: preferences.avoidColors,
       units: preferences.units,
-    });
+    }) };
     setBusy(false);
     if (generated.outfit.itemIds.length < 2) {
       toast('Not enough clean clothes left for a second option', { tone: 'danger' });
@@ -231,11 +231,6 @@ function Generator() {
         />
 
         <div className="space-y-5 px-5">
-          <Badge tone={result.source === 'ai' ? 'brand' : 'neutral'}>
-            <Sparkles size={11} />
-            {result.source === 'ai' ? 'Styled by Claude' : 'Built by the on-device engine'}
-          </Badge>
-
           {rival ? (
             <section className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -248,7 +243,7 @@ function Generator() {
                   label="B"
                   items={rivalItems}
                   onChoose={() => {
-                    setResult({ outfit: rival, source: result.source });
+                    setResult({ outfit: rival });
                     setRival(null);
                   }}
                 />
