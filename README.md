@@ -66,8 +66,14 @@ forge one. Ten wrong guesses for a name locks it out for ten minutes.
 ```sh
 echo "OUTFITAI_SECRET=..." > .env
 echo "OUTFITAI_USERS=..." >> .env
-docker compose up -d --build
+sh deploy/nas-setup.sh
 ```
+
+The script builds, starts, waits for the app to answer, and fixes one thing
+that is easy to miss: the image runs as uid 1001, but a bind-mounted folder
+keeps the host's ownership, so a `data` directory created by root is read-only
+to the app and **every sync fails with a 500 while the app otherwise looks
+perfectly healthy**.
 
 The container listens on `127.0.0.1:3210` only, so nginx is the only way in.
 `deploy/nginx-fitcheck.conf` is a ready site config for

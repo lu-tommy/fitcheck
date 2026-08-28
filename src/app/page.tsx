@@ -132,8 +132,19 @@ export default function HomePage() {
         className="px-5 pb-4"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
       >
-        <p className="text-label text-[var(--text-faint)]">{formatFriendlyDate(today)}</p>
-        <h1 className="text-display mt-1">{greeting()}</h1>
+        {/*
+          The date and the greeting depend on the reader's clock and timezone,
+          so the server — which renders in UTC, in a container — cannot get them
+          right. suppressHydrationWarning lets the client's answer win without
+          React treating the difference as a bug, and without the flicker a
+          mount-guard would cause.
+        */}
+        <p className="text-label text-[var(--text-faint)]" suppressHydrationWarning>
+          {formatFriendlyDate(today)}
+        </p>
+        <h1 className="text-display mt-1" suppressHydrationWarning>
+          {greeting()}
+        </h1>
       </header>
 
       <div className="space-y-6 px-5">

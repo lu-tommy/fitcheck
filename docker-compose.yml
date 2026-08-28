@@ -1,14 +1,19 @@
 services:
   outfitai:
     build: .
+    image: outfitai:latest
     container_name: outfitai
     restart: unless-stopped
-    # Only nginx needs to reach it; nothing is exposed to the LAN directly.
     ports:
-      - '127.0.0.1:3210:3000'
+      # Nginx Proxy Manager runs in its own container, so it cannot reach
+      # 127.0.0.1 on the host. Publishing on the LAN is the simple, always-works
+      # option; point NPM at http://<nas-ip>:3210. To keep it off the LAN
+      # entirely, drop this block, join NPM's docker network below, and point
+      # NPM at http://outfitai:3000 instead.
+      - '3210:3000'
     environment:
       OUTFITAI_DATA_DIR: /data
-      # Sessions are signed with this. Changing it signs everybody out.
+      # Signs the session cookies. Changing it signs everybody out.
       OUTFITAI_SECRET: ${OUTFITAI_SECRET:?set OUTFITAI_SECRET in .env}
       # name:salt:hash entries separated by ; — see npm run add-user
       OUTFITAI_USERS: ${OUTFITAI_USERS:?set OUTFITAI_USERS in .env}
@@ -20,4 +25,10 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 30s
+
+# Uncomment together with the note above to keep the app off the LAN.
+# networks:
+#   default:
+#     name: ${NPM_NETWORK:-npm_default}
+#     external: true
