@@ -123,32 +123,16 @@ export default function ProfilePage() {
                 </Button>
               </div>
             </div>
-          ) : authStatus !== 'unconfigured' ? (
-            <Link href="/account" className="card pressable flex items-center gap-3 p-4">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
-                <UserRound size={19} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[0.9375rem] font-medium">
-                  Sign in to back up your wardrobe
-                </span>
-                <span className="block text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
-                  Right now it lives only on this device. An account means a lost phone is not a
-                  fresh start.
-                </span>
-              </span>
-              <ChevronRight size={17} className="shrink-0 text-[var(--text-faint)]" />
-            </Link>
           ) : (
             <div className="card flex items-start gap-3 p-4">
               <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--surface-alt)] text-[var(--text-muted)]">
                 <CloudOff size={17} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[0.9375rem] font-medium">No accounts yet</span>
+                <span className="block text-[0.9375rem] font-medium">Checking your account…</span>
                 <span className="mt-0.5 block text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
-                  Nobody has been added on the server yet. Until then the export below is the
-                  only copy that survives this browser.
+                  If this stays here, the connection to the server dropped. Your wardrobe on this
+                  device is untouched.
                 </span>
               </span>
             </div>

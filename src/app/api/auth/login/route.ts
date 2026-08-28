@@ -6,6 +6,7 @@ import {
   sessionCookie,
   tooManyAttempts,
 } from '@/server/session';
+import { badRequest, readJson } from '@/server/request';
 import { accountsConfigured, findAccount, verifyPassword } from '@/server/users';
 
 export const runtime = 'nodejs';
@@ -21,10 +22,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const { username, password } = (await request.json()) as {
-    username?: string;
-    password?: string;
-  };
+  const body = await readJson<{ username?: string; password?: string }>(request);
+  if (!body) return badRequest();
+  const { username, password } = body;
   if (!username || !password) {
     return Response.json(
       { error: 'bad_request', message: 'Enter a name and a password.' },
@@ -56,6 +56,6 @@ export async function POST(request: Request) {
     );
   }
 
-  (await cookies()).set(sessionCookie(createToken(account.id)));
+  (await cookies()).set(sessionCookie(await createToken(account.id)));
   return Response.json({ userId: account.id, username: account.username });
 }

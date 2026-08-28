@@ -17,9 +17,11 @@ npm test           # 90 tests over the domain logic
 npm run typecheck
 ```
 
-**Nothing needs configuring to run it.** Adding clothes, generating outfits,
-planning a week, packing a trip, laundry, stats and weather all work out of the
-box. `.env.local` only adds accounts and backup — see below.
+**You need an account before the app will open.** Create one with
+`npm run add-user` and put the line it prints into `.env.local`; the steps are
+under *Accounts on your own server* below. Everything after that — clothes,
+outfits, planning, packing, laundry, stats, weather — needs no further setup and
+no keys.
 
 To look around before photographing anything, tap **try a demo wardrobe** on the
 home screen (or **You → Load a demo wardrobe**). Demo pieces have no photo and
@@ -41,11 +43,19 @@ Open-Meteo, which needs no key either.
 
 ## Accounts on your own server
 
-Sign in and the wardrobe is copied to a folder on your own machine — a lost
-phone stops being a fresh start, and the same account works on a phone and a
-tablet. There is no third party involved and nothing to pay for. **The app works
-fully without an account**, signed out and offline; an account is additive, not
-a wall in front of the door.
+**Nothing is reachable without signing in.** The same shape as Jellyfin: the app
+is behind the login rather than the login being an optional extra. A signed-out
+request is stopped by `src/middleware.ts` before any page renders, and the data
+endpoints refuse outright with a 401.
+
+Signing in also copies the wardrobe to a folder on your own machine, so a lost
+phone stops being a fresh start and the same account works on a phone and a
+tablet. There is no third party involved and nothing to pay for.
+
+Once signed in it still works offline: the service worker serves the shell, the
+wardrobe is in IndexedDB, and the gate only applies to requests that reach the
+server. The service worker deliberately refuses to cache a signed-out redirect,
+which would otherwise strand an offline app on the sign-in screen.
 
 ### Setting it up
 

@@ -49,8 +49,12 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(SHELL).then((cache) => cache.put(OFFLINE_URL, copy));
+          // Only cache a real page. A signed-out request is a redirect to the
+          // sign-in screen, and caching that would strand an offline app there.
+          if (response.ok && !response.redirected && response.type === 'basic') {
+            const copy = response.clone();
+            caches.open(SHELL).then((cache) => cache.put(OFFLINE_URL, copy));
+          }
           return response;
         })
         .catch(() => caches.match(OFFLINE_URL).then((cached) => cached || Response.error())),

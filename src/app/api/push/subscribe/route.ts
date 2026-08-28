@@ -1,3 +1,4 @@
+import { badRequest, readJson } from '@/server/request';
 import { currentUserId } from '@/server/session';
 import { publicKey, pushConfigured, saveSubscription } from '@/server/push';
 
@@ -19,16 +20,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json()) as {
+  const body = await readJson<{
     subscription?: PushSubscriptionJSON;
     timeZone?: string;
     hour?: number;
     minute?: number;
-  };
+  }>(request);
 
-  if (!body.subscription?.endpoint) {
-    return Response.json({ error: 'bad_request' }, { status: 400 });
-  }
+  if (!body?.subscription?.endpoint) return badRequest('No push subscription was sent.');
 
   await saveSubscription(userId, {
     subscription: body.subscription as never,

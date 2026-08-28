@@ -27,7 +27,7 @@ const TABS = [
 ] as const;
 
 /** Full-screen flows that own the whole viewport and hide the tab bar. */
-const IMMERSIVE = ['/add'];
+const IMMERSIVE = ['/add', '/account'];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();

@@ -1,5 +1,12 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
+
+import {
+  MAX_AGE_SECONDS,
+  SESSION_COOKIE,
+  createToken as createTokenWith,
+  readToken as readTokenWith,
+} from './token';
 
 /**
  * Sessions, without a database.
@@ -10,8 +17,7 @@ import { cookies } from 'next/headers';
  * script cannot read it.
  */
 
-export const SESSION_COOKIE = 'outfitai_session';
-const MAX_AGE_SECONDS = 60 * 60 * 24 * 90;
+export { MAX_AGE_SECONDS, SESSION_COOKIE };
 
 /**
  * A generated secret keeps development working, but it changes on every
@@ -32,34 +38,22 @@ function secret(): string {
   return fallbackSecret;
 }
 
-function sign(payload: string): string {
-  return createHmac('sha256', secret()).update(payload).digest('hex');
+export async function createToken(userId: string): Promise<string> {
+  return createTokenWith(userId, secret());
 }
 
-export function createToken(userId: string): string {
-  const expiry = Date.now() + MAX_AGE_SECONDS * 1000;
-  const payload = `${userId}.${expiry}`;
-  return `${payload}.${sign(payload)}`;
-}
-
-export function readToken(token: string | undefined): string | null {
-  if (!token) return null;
-  const parts = token.split('.');
-  if (parts.length !== 3) return null;
-  const [userId, expiry, signature] = parts;
-
-  const expected = Buffer.from(sign(`${userId}.${expiry}`));
-  const provided = Buffer.from(signature);
-  if (expected.length !== provided.length) return null;
-  if (!timingSafeEqual(expected, provided)) return null;
-  if (Number(expiry) < Date.now()) return null;
-
-  return userId;
+export async function readToken(token: string | undefined): Promise<string | null> {
+  return readTokenWith(token, secret());
 }
 
 export async function currentUserId(): Promise<string | null> {
   const store = await cookies();
   return readToken(store.get(SESSION_COOKIE)?.value);
+}
+
+/** The secret, for the middleware, which cannot import the cookie helpers. */
+export function sessionSecret(): string {
+  return secret();
 }
 
 export function sessionCookie(token: string) {
