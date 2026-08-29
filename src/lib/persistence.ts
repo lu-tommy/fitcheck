@@ -99,11 +99,21 @@ export async function showInstallPrompt(): Promise<'accepted' | 'dismissed' | 'u
 export function registerServiceWorker(): void {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
   if (process.env.NODE_ENV !== 'production') return;
-  window.addEventListener('load', () => {
+
+  const register = () => {
     navigator.serviceWorker.register('/sw.js').catch((error) => {
       // An offline app that fails to go offline is a degraded app, not a broken
       // one — never let this take the page down with it.
       console.warn('[outfitai] service worker registration failed:', error);
     });
-  });
+  };
+
+  /*
+   * This is called from a React effect, which runs after the page has already
+   * finished loading — so waiting for the `load` event registers nothing at
+   * all, silently, for the entire life of the app. Offline support was dead
+   * for exactly that reason.
+   */
+  if (document.readyState === 'complete') register();
+  else window.addEventListener('load', register, { once: true });
 }

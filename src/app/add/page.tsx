@@ -393,9 +393,11 @@ export default function AddPage() {
                         {categoryLabel(entry.draft.category)} ·{' '}
                         {titleCase(entry.draft.primaryColor)}
                       </p>
-                      <span className="mt-1 inline-flex items-center gap-1 text-[0.6875rem] text-[var(--text-faint)]">
-                        <Sparkles size={11} /> Colour detected
-                      </span>
+                      {entry.photo ? (
+                        <span className="mt-1 inline-flex items-center gap-1 text-[0.6875rem] text-[var(--text-faint)]">
+                          <Sparkles size={11} /> Colour read from the photo
+                        </span>
+                      ) : null}
                     </>
                   )}
                 </div>

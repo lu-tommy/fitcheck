@@ -20,6 +20,7 @@ import {
   FORMALITY_ORDER,
   OCCASIONS,
   SLOT_LABEL,
+  SLOT_LABEL_PLURAL,
   STYLES,
   STYLE_LABEL,
   slotOf,
@@ -65,6 +66,14 @@ function Generator() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ outfit: GeneratedOutfit } | null>(null);
   const [rival, setRival] = useState<GeneratedOutfit | null>(null);
+  /*
+   * The engine is deterministic, so the same closet and the same question give
+   * the same answer — and "Try again" returned the identical outfit however
+   * many times it was pressed, which reads as the app ignoring you. Holding
+   * back what has just been shown makes a retry mean something. It is a
+   * penalty, not an exclusion, so a small wardrobe still gets dressed.
+   */
+  const [alreadySeen, setAlreadySeen] = useState<string[]>([]);
   const [sharing, setSharing] = useState(false);
 
   // "Style this" from an item page arrives as a query parameter.
@@ -98,9 +107,10 @@ function Generator() {
     [resultItems],
   );
 
-  async function run() {
+  async function run(options?: { fresh?: boolean }) {
     if (!items.length) return;
     setBusy(true);
+    const resting = options?.fresh ? [] : alreadySeen;
     const generated = { outfit: buildOutfitLocally({
       request: {
         prompt: prompt.trim() || occasion || 'Something good for today',
@@ -119,9 +129,15 @@ function Generator() {
       preferredStyles: preferences.preferredStyles,
       avoidColors: preferences.avoidColors,
       units: preferences.units,
+      restingItemIds: resting,
     }) };
     setResult(generated);
     setRival(null);
+    // Remember the last two looks, so retries move on without exhausting a
+    // small wardrobe after a couple of presses.
+    setAlreadySeen((current) =>
+      [...generated.outfit.itemIds, ...current].slice(0, generated.outfit.itemIds.length * 2),
+    );
     setBusy(false);
   }
 
@@ -209,14 +225,35 @@ function Generator() {
     });
   }
 
-  if (hydrated && !items.length) {
+  /*
+   * An outfit needs something up top, something below and shoes. With less than
+   * that the engine returns a single garment and a list of warnings, which the
+   * screen then dresses up with a colour score — worse than admitting it cannot
+   * do the job yet.
+   */
+  const wearable = ['top', 'fullbody'].some((slot) =>
+    items.some((item) => slotOf(item.category) === slot),
+  )
+    ? items.some((item) => slotOf(item.category) === 'footwear')
+    : false;
+  const missingSlots = (['top', 'bottom', 'footwear'] as const).filter(
+    (slot) => !items.some((item) => slotOf(item.category) === slot),
+  );
+
+  if (hydrated && (!items.length || !wearable)) {
     return (
       <>
         <PageHeader title="Generate" />
         <EmptyState
           icon={<Sparkles size={26} />}
-          title="Nothing to work with yet"
-          body="OutfitAI only ever suggests clothes you actually own, so it needs a closet first."
+          title={items.length ? 'Not quite enough to dress you' : 'Nothing to work with yet'}
+          body={
+            items.length
+              ? `An outfit needs something up top, something below and shoes. You are missing ${missingSlots
+                  .map((slot) => SLOT_LABEL_PLURAL[slot].toLowerCase())
+                  .join(' and ')}.`
+              : 'OutfitAI only ever suggests clothes you actually own, so it needs a closet first.'
+          }
           action={<ButtonLink href="/add">Add clothing</ButtonLink>}
         />
       </>
@@ -520,7 +557,15 @@ function Generator() {
           </p>
         ) : null}
 
-        <Button full size="lg" onClick={() => void run()} disabled={busy}>
+        <Button
+          full
+          size="lg"
+          onClick={() => {
+            setAlreadySeen([]);
+            void run({ fresh: true });
+          }}
+          disabled={busy}
+        >
           {busy ? <Spinner label="Building your outfit" /> : 'Generate outfit'}
         </Button>
       </div>

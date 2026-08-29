@@ -133,3 +133,43 @@ describe('swap suggestions', () => {
     expect(reasons).toMatch(/sharper|more relaxed|warmer|lighter|brown|tan|blue|white|denim/);
   });
 });
+
+describe('asking again', () => {
+  /*
+   * The engine is deterministic, so without holding back what was just shown a
+   * retry returns the identical outfit — which reads as the app ignoring you.
+   * This is the behaviour behind the Generate screen's "Try again".
+   */
+  const closet = [
+    ...['tshirt', 'shirt', 'polo'].map((category, i) =>
+      makeItem({ id: `top-${i}`, category: category as never, primaryColor: ['white', 'navy', 'olive'][i] }),
+    ),
+    ...['jeans', 'chinos'].map((category, i) =>
+      makeItem({ id: `bottom-${i}`, category: category as never, primaryColor: ['denim', 'tan'][i] }),
+    ),
+    ...['sneakers', 'boots'].map((category, i) =>
+      makeItem({ id: `shoe-${i}`, category: category as never, primaryColor: ['white', 'brown'][i] }),
+    ),
+  ];
+
+  const build = (resting: string[] = []) =>
+    buildOutfitLocally({ request, closet, restingItemIds: resting }).itemIds;
+
+  it('returns the same outfit when nothing is held back', () => {
+    expect(build()).toEqual(build());
+  });
+
+  it('offers a different outfit once the last one is held back', () => {
+    const first = build();
+    const second = build(first);
+    expect(second).not.toEqual(first);
+    expect(second.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('still dresses you when nearly everything has been held back', () => {
+    const first = build();
+    const second = build(first);
+    const third = build([...first, ...second]);
+    expect(third.length).toBeGreaterThanOrEqual(3);
+  });
+});
