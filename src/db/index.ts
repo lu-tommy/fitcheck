@@ -6,14 +6,22 @@ import { nowIso } from '@/lib/date';
 import type { SyncedStore, Tombstone } from '@/types';
 
 import { DB_VERSION, runMigrations } from './migrations';
-import type { OutfitAIDB, MetaShapes, StoredPhoto } from './schema';
+import type { FitCheckDB, MetaShapes, StoredPhoto } from './schema';
 
+/*
+ * Deliberately still 'outfitai', after the app was renamed to FitCheck.
+ *
+ * An IndexedDB database cannot be renamed — a new name is a new, empty
+ * database, and every wardrobe already on a phone would be abandoned where
+ * nothing but the browser's storage inspector could reach it. Nobody ever sees
+ * this string; losing somebody's clothes to tidy it up would be a bad trade.
+ */
 const DB_NAME = 'outfitai';
 
-let dbPromise: Promise<IDBPDatabase<OutfitAIDB>> | null = null;
+let dbPromise: Promise<IDBPDatabase<FitCheckDB>> | null = null;
 
 /** Broadcast so a second tab does not keep showing a stale wardrobe. */
-const CHANNEL = 'outfitai:changes';
+const CHANNEL = 'fitcheck:changes';
 /**
  * A BroadcastChannel does not hear its own posts, but a second channel object
  * in the same tab does — so messages carry the tab that sent them and a
@@ -54,17 +62,17 @@ export function onLocalWrite(handler: () => void): () => void {
  * IndexedDB does not exist during SSR or prerender, so every caller goes
  * through here and every caller is a client component effect.
  */
-export function db(): Promise<IDBPDatabase<OutfitAIDB>> {
+export function db(): Promise<IDBPDatabase<FitCheckDB>> {
   if (typeof indexedDB === 'undefined') {
     return Promise.reject(new Error('IndexedDB is unavailable in this environment'));
   }
   if (!dbPromise) {
-    dbPromise = openDB<OutfitAIDB>(DB_NAME, DB_VERSION, {
+    dbPromise = openDB<FitCheckDB>(DB_NAME, DB_VERSION, {
       async upgrade(database, oldVersion, _newVersion, transaction) {
         await runMigrations(database, transaction, oldVersion);
       },
       blocked() {
-        console.warn('[outfitai] another tab is holding an older database version open');
+        console.warn('[fitcheck] another tab is holding an older database version open');
       },
       blocking() {
         // Another tab wants to upgrade. Let go rather than deadlock it: the
@@ -89,14 +97,14 @@ type CollectionName = 'items' | 'outfits' | 'wearLogs' | 'calendar' | 'packing' 
 
 export async function readAll<K extends CollectionName>(
   store: K,
-): Promise<OutfitAIDB[K]['value'][]> {
+): Promise<FitCheckDB[K]['value'][]> {
   const database = await db();
   return database.getAll(store);
 }
 
 export async function put<K extends CollectionName>(
   store: K,
-  value: OutfitAIDB[K]['value'],
+  value: FitCheckDB[K]['value'],
 ): Promise<void> {
   const database = await db();
   await database.put(store, value);
@@ -105,7 +113,7 @@ export async function put<K extends CollectionName>(
 
 export async function putMany<K extends CollectionName>(
   store: K,
-  values: OutfitAIDB[K]['value'][],
+  values: FitCheckDB[K]['value'][],
 ): Promise<void> {
   if (!values.length) return;
   const database = await db();

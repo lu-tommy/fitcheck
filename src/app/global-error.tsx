@@ -16,7 +16,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[outfitai] root layout crashed:', error);
+    console.error('[fitcheck] root layout crashed:', error);
   }, [error]);
 
   return (
@@ -34,7 +34,7 @@ export default function GlobalError({
           fontFamily: 'system-ui, sans-serif',
         }}
       >
-        <h1 style={{ fontSize: '1.3rem', fontWeight: 600, margin: 0 }}>OutfitAI could not start</h1>
+        <h1 style={{ fontSize: '1.3rem', fontWeight: 600, margin: 0 }}>FitCheck could not start</h1>
         <p style={{ maxWidth: '24rem', lineHeight: 1.6, margin: 0, opacity: 0.75 }}>
           Your wardrobe is still stored in this browser and has not been touched. Reloading usually
           fixes this.

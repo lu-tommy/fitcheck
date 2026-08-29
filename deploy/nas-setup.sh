@@ -1,5 +1,5 @@
 #!/bin/sh
-# Bring OutfitAI up on the NAS, or update it in place.
+# Bring FitCheck up on the NAS, or update it in place.
 #
 # Safe to run repeatedly. It never touches Nginx Proxy Manager, and it never
 # touches ./data — the wardrobes survive every rebuild.
@@ -21,8 +21,8 @@ cd "$(dirname "$0")/.."
 if [ ! -f .env ]; then
   echo "No .env here. Create it first:"
   echo
-  echo "  OUTFITAI_SECRET=<64 hex characters>"
-  echo "  OUTFITAI_USERS=<name:salt:hash;name:salt:hash>"
+  echo "  FITCHECK_SECRET=<64 hex characters>"
+  echo "  FITCHECK_USERS=<name:salt:hash;name:salt:hash>"
   echo
   echo "Generate a secret with:"
   echo "  node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\""
@@ -30,12 +30,12 @@ if [ ! -f .env ]; then
 fi
 
 # A missing or half-written secret signs everybody out on every restart.
-if ! grep -q '^OUTFITAI_SECRET=.\{32,\}' .env; then
-  echo "OUTFITAI_SECRET in .env is missing or too short (needs 32+ characters)."
+if ! grep -q '^FITCHECK_SECRET=.\{32,\}' .env; then
+  echo "FITCHECK_SECRET in .env is missing or too short (needs 32+ characters)."
   exit 1
 fi
-if ! grep -q '^OUTFITAI_USERS=..*:..*:..*' .env; then
-  echo "OUTFITAI_USERS in .env has no name:salt:hash entries."
+if ! grep -q '^FITCHECK_USERS=..*:..*:..*' .env; then
+  echo "FITCHECK_USERS in .env has no name:salt:hash entries."
   exit 1
 fi
 
@@ -89,5 +89,5 @@ while [ "$i" -lt 60 ]; do
 done
 
 echo "It did not answer within 60s. Recent logs:"
-compose logs --tail 40 outfitai
+compose logs --tail 40 fitcheck
 exit 1

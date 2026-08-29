@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 import type { SyncedStore, Tombstone } from '@/types';
+import { readEnv } from './env';
 
 /**
  * Where a wardrobe actually lives on the NAS.
@@ -40,7 +41,7 @@ interface Wardrobe {
 const EMPTY: Wardrobe = { version: 1, nextStamp: 1, records: {}, tombstones: {} };
 
 function root(): string {
-  return process.env.OUTFITAI_DATA_DIR ?? path.join(process.cwd(), 'data');
+  return readEnv('DATA_DIR') ?? path.join(process.cwd(), 'data');
 }
 
 /** Ids come from a signed session, but a path separator would still escape. */

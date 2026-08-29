@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Print an OUTFITAI_USERS entry for one person.
+ * Print an FITCHECK_USERS entry for one person.
  *
  *   npm run add-user -- lia
  *
@@ -51,7 +51,7 @@ if ((await askHidden('Again: ')) !== password) {
 const salt = randomBytes(16).toString('hex');
 const hash = scryptSync(password, salt, 64).toString('hex');
 
-console.log('Add this to OUTFITAI_USERS in .env.local (entries are separated by ;):');
+console.log('Add this to FITCHECK_USERS in .env.local (entries are separated by ;):');
 console.log('');
 console.log(`${username}:${salt}:${hash}`);
 console.log('');

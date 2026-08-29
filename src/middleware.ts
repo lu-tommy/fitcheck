@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { SESSION_COOKIE, readToken } from '@/server/token';
+import { LEGACY_SESSION_COOKIE, SESSION_COOKIE, readToken } from '@/server/token';
+import { readEnv } from '@/server/env';
 
 /**
  * The front door.
@@ -43,7 +44,7 @@ export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   if (isPublic(pathname)) return NextResponse.next();
 
-  const secret = process.env.OUTFITAI_SECRET;
+  const secret = readEnv('SECRET');
   if (!secret || secret.length < 16) {
     // Without a secret no token can be verified, so nothing can be trusted.
     // Failing closed is the only safe answer.
@@ -52,7 +53,12 @@ export async function middleware(request: NextRequest) {
       : NextResponse.redirect(new URL('/account', request.url));
   }
 
-  const userId = await readToken(request.cookies.get(SESSION_COOKIE)?.value, secret);
+  // Either name — see LEGACY_SESSION_COOKIE. The token itself is unchanged,
+  // so a cookie set before the rename still verifies.
+  const cookie =
+    request.cookies.get(SESSION_COOKIE)?.value ??
+    request.cookies.get(LEGACY_SESSION_COOKIE)?.value;
+  const userId = await readToken(cookie, secret);
   if (userId) return NextResponse.next();
 
   if (pathname.startsWith('/api/')) {

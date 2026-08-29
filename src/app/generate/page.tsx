@@ -263,7 +263,7 @@ function Generator() {
               ? `An outfit needs something up top, something below and shoes. You are missing ${missingSlots
                   .map((slot) => SLOT_LABEL_PLURAL[slot].toLowerCase())
                   .join(' and ')}.`
-              : 'OutfitAI only ever suggests clothes you actually own, so it needs a closet first.'
+              : 'FitCheck only ever suggests clothes you actually own, so it needs a closet first.'
           }
           action={<ButtonLink href="/add">Add clothing</ButtonLink>}
         />

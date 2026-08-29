@@ -104,7 +104,7 @@ export function registerServiceWorker(): void {
     navigator.serviceWorker.register('/sw.js').catch((error) => {
       // An offline app that fails to go offline is a degraded app, not a broken
       // one — never let this take the page down with it.
-      console.warn('[outfitai] service worker registration failed:', error);
+      console.warn('[fitcheck] service worker registration failed:', error);
     });
   };
 

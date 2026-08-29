@@ -49,7 +49,7 @@ function SignIn() {
         />
         <p className="mx-5 rounded-2xl bg-[var(--surface-alt)] p-4 text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
           Add people with <code className="font-mono">npm run add-user</code> and put the line it
-          prints into <code className="font-mono">OUTFITAI_USERS</code>. The steps are in the
+          prints into <code className="font-mono">FITCHECK_USERS</code>. The steps are in the
           README under <strong>Accounts on your own server</strong>.
         </p>
       </>
@@ -84,7 +84,7 @@ function SignIn() {
           >
             <WardrobeMark className="text-[var(--on-brand)] opacity-90" />
           </span>
-          <h1 className="text-display">OutfitAI</h1>
+          <h1 className="text-display">FitCheck</h1>
           <p className="mx-auto mt-2 max-w-[19rem] text-[0.9375rem] leading-relaxed text-[var(--text-muted)]">
             Outfits built only from the clothes hanging in your own wardrobe.
           </p>

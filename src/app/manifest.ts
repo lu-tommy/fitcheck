@@ -7,8 +7,8 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'OutfitAI',
-    short_name: 'OutfitAI',
+    name: 'FitCheck',
+    short_name: 'FitCheck',
     description: 'Build outfits from the clothes you already own.',
     start_url: '/',
     display: 'standalone',

@@ -1,6 +1,6 @@
 import type { IDBPDatabase, IDBPTransaction, StoreNames } from 'idb';
 
-import type { OutfitAIDB } from './schema';
+import type { FitCheckDB } from './schema';
 
 /**
  * Schema migrations.
@@ -19,8 +19,8 @@ export interface Migration {
   version: number;
   describe: string;
   run: (
-    database: IDBPDatabase<OutfitAIDB>,
-    transaction: IDBPTransaction<OutfitAIDB, StoreNames<OutfitAIDB>[], 'versionchange'>,
+    database: IDBPDatabase<FitCheckDB>,
+    transaction: IDBPTransaction<FitCheckDB, StoreNames<FitCheckDB>[], 'versionchange'>,
   ) => void | Promise<void>;
 }
 
@@ -90,8 +90,8 @@ export const DB_VERSION = MIGRATIONS.reduce(
 );
 
 export async function runMigrations(
-  database: IDBPDatabase<OutfitAIDB>,
-  transaction: IDBPTransaction<OutfitAIDB, StoreNames<OutfitAIDB>[], 'versionchange'>,
+  database: IDBPDatabase<FitCheckDB>,
+  transaction: IDBPTransaction<FitCheckDB, StoreNames<FitCheckDB>[], 'versionchange'>,
   fromVersion: number,
 ): Promise<void> {
   const pending = MIGRATIONS.filter((migration) => migration.version > fromVersion).sort(

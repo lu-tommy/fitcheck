@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Fraunces, Instrument_Sans } from 'next/font/google';
 
 import { AppShell } from '@/components/AppShell';
-import { THEME_STORAGE_KEY } from '@/store/preferences';
+import { LEGACY_THEME_STORAGE_KEY, THEME_STORAGE_KEY } from '@/store/preferences';
 
 import './globals.css';
 
@@ -24,10 +24,10 @@ const sans = Instrument_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'OutfitAI',
+  title: 'FitCheck',
   description: 'Digitise your wardrobe and build outfits from the clothes you already own.',
   manifest: '/manifest.webmanifest',
-  appleWebApp: { capable: true, title: 'OutfitAI', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: 'FitCheck', statusBarStyle: 'default' },
 };
 
 export const viewport: Viewport = {
@@ -48,6 +48,8 @@ export const viewport: Viewport = {
  */
 const THEME_SCRIPT = `(function(){try{var m=localStorage.getItem(${JSON.stringify(
   THEME_STORAGE_KEY,
+)})||localStorage.getItem(${JSON.stringify(
+  LEGACY_THEME_STORAGE_KEY,
 )});if(m==='dark'||m==='light'){document.documentElement.setAttribute('data-theme',m);}}catch(e){}})();`;
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

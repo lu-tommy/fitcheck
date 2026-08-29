@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import webpush, { type PushSubscription } from 'web-push';
+import { readEnv } from './env';
 
 /**
  * Daily reminders.
@@ -36,7 +37,7 @@ interface PushFile {
 const EMPTY: PushFile = { version: 1, subscriptions: {} };
 
 function root(): string {
-  return process.env.OUTFITAI_DATA_DIR ?? path.join(process.cwd(), 'data');
+  return readEnv('DATA_DIR') ?? path.join(process.cwd(), 'data');
 }
 
 function safeId(userId: string): string {
@@ -62,7 +63,7 @@ function ensureConfigured(): boolean {
     webpush.setVapidDetails(
       // A contact for the push service to reach if something goes wrong. It is
       // never shown to anyone and never receives mail in practice.
-      process.env.VAPID_SUBJECT ?? 'mailto:outfitai@localhost',
+      process.env.VAPID_SUBJECT ?? 'mailto:fitcheck@localhost',
       process.env.VAPID_PUBLIC_KEY!,
       process.env.VAPID_PRIVATE_KEY!,
     );
@@ -174,7 +175,7 @@ export async function sendDueReminders(userIds: string[]): Promise<number> {
           entry.subscription,
           JSON.stringify({
             title: 'Today’s outfit is ready',
-            body: 'Open OutfitAI to see what to wear.',
+            body: 'Open FitCheck to see what to wear.',
             url: '/',
           }),
         );
@@ -189,7 +190,7 @@ export async function sendDueReminders(userIds: string[]): Promise<number> {
           delete file.subscriptions[key];
           changed = true;
         } else {
-          console.warn(`[outfitai] reminder for ${userId} failed:`, status ?? error);
+          console.warn(`[fitcheck] reminder for ${userId} failed:`, status ?? error);
         }
       }
     }

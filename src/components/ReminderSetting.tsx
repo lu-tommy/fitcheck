@@ -29,7 +29,7 @@ const EXPLANATION: Record<ReminderState, string> = {
   denied:
     'Notifications are blocked for this site. Turn them back on in your browser settings, then come back.',
   'needs-install':
-    'Add OutfitAI to your home screen first — iOS only allows notifications for installed apps.',
+    'Add FitCheck to your home screen first — iOS only allows notifications for installed apps.',
   unsupported: 'This browser cannot do notifications.',
   'not-configured':
     'Reminders are not set up on the server. Add VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY and restart.',

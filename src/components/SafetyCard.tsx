@@ -169,7 +169,7 @@ function InstallCard({
           <ShieldCheck size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[0.9375rem] font-semibold">Add OutfitAI to your home screen</h2>
+          <h2 className="text-[0.9375rem] font-semibold">Add FitCheck to your home screen</h2>
           <p className="mt-1 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
             Browsers clear the storage of sites you have not opened in a while, and an installed
             app is exempt. It also opens without a connection, and it is the only way iOS will

@@ -19,7 +19,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
  * async, so only a synchronous store can be read by the blocking script in
  * <head> that stamps the theme before first paint.
  */
-export const THEME_STORAGE_KEY = 'outfitai:theme';
+export const THEME_STORAGE_KEY = 'fitcheck:theme';
+
+/** Pre-rename key, still read once so nobody's dark mode resets to system. */
+export const LEGACY_THEME_STORAGE_KEY = 'outfitai:theme';
 
 interface PreferencesState {
   preferences: Preferences;

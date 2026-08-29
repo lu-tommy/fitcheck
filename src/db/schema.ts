@@ -32,7 +32,7 @@ export interface MetaRecord {
   value: unknown;
 }
 
-export interface OutfitAIDB extends DBSchema {
+export interface FitCheckDB extends DBSchema {
   items: {
     key: string;
     value: ClothingItem;

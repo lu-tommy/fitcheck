@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         error: 'no_accounts',
-        message: 'No accounts are set up on the server yet. See OUTFITAI_USERS in .env.example.',
+        message: 'No accounts are set up on the server yet. See FITCHECK_USERS in .env.example.',
       },
       { status: 503 },
     );

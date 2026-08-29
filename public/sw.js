@@ -1,5 +1,5 @@
 /*
- * OutfitAI service worker.
+ * FitCheck service worker.
  *
  * The job is narrow: make the app open when there is no signal. Wardrobe data
  * never comes over the network — it is already in IndexedDB — so this only has
@@ -11,8 +11,8 @@
  */
 
 const VERSION = 'v1';
-const SHELL = `outfitai-shell-${VERSION}`;
-const ASSETS = `outfitai-assets-${VERSION}`;
+const SHELL = `fitcheck-shell-${VERSION}`;
+const ASSETS = `fitcheck-assets-${VERSION}`;
 const OFFLINE_URL = '/';
 
 self.addEventListener('install', (event) => {
@@ -28,7 +28,13 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith('outfitai-') && !key.endsWith(VERSION))
+            // Both prefixes: a device that ran the app before the rename is
+            // still holding outfitai-* caches, and nothing else will clear them.
+            .filter(
+              (key) =>
+                (key.startsWith('fitcheck-') || key.startsWith('outfitai-')) &&
+                !key.endsWith(VERSION),
+            )
             .map((key) => caches.delete(key)),
         ),
       )
@@ -80,7 +86,7 @@ self.addEventListener('fetch', (event) => {
 /* ------------------------------------------------------------ reminders -- */
 
 self.addEventListener('push', (event) => {
-  let payload = { title: 'OutfitAI', body: 'Time to pick today’s outfit.', url: '/' };
+  let payload = { title: 'FitCheck', body: 'Time to pick today’s outfit.', url: '/' };
   try {
     if (event.data) payload = { ...payload, ...event.data.json() };
   } catch {
@@ -94,7 +100,7 @@ self.addEventListener('push', (event) => {
       badge: '/icon-192.png',
       // One reminder at a time: a new one replaces yesterday's rather than
       // stacking up unread in the shade.
-      tag: 'outfitai-daily',
+      tag: 'fitcheck-daily',
       renotify: true,
       data: { url: payload.url },
     }),

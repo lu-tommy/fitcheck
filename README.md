@@ -1,4 +1,4 @@
-# OutfitAI — web
+# FitCheck — web
 
 Photograph the clothes you already own, and get outfits built from that closet
 and nothing else. No shopping suggestions dressed up as styling.
@@ -69,21 +69,21 @@ which would otherwise strand an offline app on the sign-in screen.
 
 ```sh
 cp .env.example .env.local
-node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"   # OUTFITAI_SECRET
-npm run add-user -- lia      # prints a name:salt:hash line for OUTFITAI_USERS
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"   # FITCHECK_SECRET
+npm run add-user -- lia      # prints a name:salt:hash line for FITCHECK_USERS
 npm run add-user -- tommy    # entries are separated by ;
 ```
 
 Passwords are never stored — only a scrypt hash and its salt — so `.env.local`
 does not hand anyone a way in if it leaks. Sessions are an httpOnly cookie
-signed with `OUTFITAI_SECRET`, so page scripts cannot read them and nobody can
+signed with `FITCHECK_SECRET`, so page scripts cannot read them and nobody can
 forge one. Ten wrong guesses for a name locks it out for ten minutes.
 
 ### Running it on a NAS
 
 ```sh
-echo "OUTFITAI_SECRET=..." > .env
-echo "OUTFITAI_USERS=..." >> .env
+echo "FITCHECK_SECRET=..." > .env
+echo "FITCHECK_USERS=..." >> .env
 sh deploy/nas-setup.sh
 ```
 

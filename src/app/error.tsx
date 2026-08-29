@@ -18,7 +18,7 @@ export default function ErrorScreen({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[outfitai] screen crashed:', error);
+    console.error('[fitcheck] screen crashed:', error);
   }, [error]);
 
   return (

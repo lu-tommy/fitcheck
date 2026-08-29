@@ -1,5 +1,5 @@
 /**
- * Domain model for OutfitAI.
+ * Domain model for FitCheck.
  *
  * Everything the app persists or sends to the AI is described here. Slots are
  * the backbone: they decide how an outfit stacks visually and which pieces can

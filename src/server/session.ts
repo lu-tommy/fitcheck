@@ -3,10 +3,12 @@ import { cookies } from 'next/headers';
 
 import {
   MAX_AGE_SECONDS,
+  LEGACY_SESSION_COOKIE,
   SESSION_COOKIE,
   createToken as createTokenWith,
   readToken as readTokenWith,
 } from './token';
+import { readEnv } from './env';
 
 /**
  * Sessions, without a database.
@@ -21,17 +23,17 @@ export { MAX_AGE_SECONDS, SESSION_COOKIE };
 
 /**
  * A generated secret keeps development working, but it changes on every
- * restart — which signs everyone out. Production must set OUTFITAI_SECRET.
+ * restart — which signs everyone out. Production must set FITCHECK_SECRET.
  */
 let fallbackSecret: string | null = null;
 
 function secret(): string {
-  const configured = process.env.OUTFITAI_SECRET;
+  const configured = readEnv('SECRET');
   if (configured && configured.length >= 16) return configured;
   if (!fallbackSecret) {
     fallbackSecret = randomBytes(32).toString('hex');
     console.warn(
-      '[outfitai] OUTFITAI_SECRET is not set. Using a temporary one, so everybody is signed ' +
+      '[fitcheck] FITCHECK_SECRET is not set. Using a temporary one, so everybody is signed ' +
         'out whenever the server restarts. Set it in .env.local before deploying.',
     );
   }
@@ -48,7 +50,7 @@ export async function readToken(token: string | undefined): Promise<string | nul
 
 export async function currentUserId(): Promise<string | null> {
   const store = await cookies();
-  return readToken(store.get(SESSION_COOKIE)?.value);
+  return readToken(store.get(SESSION_COOKIE)?.value ?? store.get(LEGACY_SESSION_COOKIE)?.value);
 }
 
 /** The secret, for the middleware, which cannot import the cookie helpers. */
@@ -66,7 +68,7 @@ export function sessionCookie(token: string) {
     maxAge: MAX_AGE_SECONDS,
     // Behind nginx with TLS this is https; over plain http on the LAN a secure
     // cookie would never be sent, so it follows the deployment.
-    secure: process.env.NODE_ENV === 'production' && process.env.OUTFITAI_INSECURE !== 'true',
+    secure: process.env.NODE_ENV === 'production' && readEnv('INSECURE') !== 'true',
   };
 }
 

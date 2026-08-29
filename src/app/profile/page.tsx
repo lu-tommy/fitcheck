@@ -287,7 +287,7 @@ export default function ProfilePage() {
                 hint={
                   persisted === 'persisted'
                     ? 'The browser will not clear it to reclaim space.'
-                    : 'Add OutfitAI to your home screen and this usually flips on.'
+                    : 'Add FitCheck to your home screen and this usually flips on.'
                 }
               />
               <StatusLine
@@ -384,7 +384,7 @@ export default function ProfilePage() {
         </section>
 
         <p className="pb-2 text-center text-[0.75rem] text-[var(--text-faint)]">
-          OutfitAI — web preview
+          FitCheck — web preview
         </p>
       </div>
 

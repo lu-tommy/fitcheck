@@ -21,7 +21,9 @@ import type {
  * names pointing at pictures that are gone.
  */
 
-const FORMAT = 'outfitai-backup';
+const FORMAT = 'fitcheck-backup';
+/** Backups written before the rename. Restoring one must keep working. */
+const LEGACY_FORMAT = 'outfitai-backup';
 const VERSION = 1;
 
 export interface Backup {
@@ -86,11 +88,11 @@ export interface ImportSummary {
 /** Merges into what is already there; ids collide only if the same backup is imported twice. */
 export async function importBackup(file: File): Promise<ImportSummary> {
   const parsed = JSON.parse(await file.text()) as Backup;
-  if (parsed.format !== FORMAT) {
-    throw new Error('That file is not an OutfitAI backup.');
+  if (parsed.format !== FORMAT && parsed.format !== LEGACY_FORMAT) {
+    throw new Error('That file is not an FitCheck backup.');
   }
   if (parsed.version > VERSION) {
-    throw new Error('That backup was made by a newer version of OutfitAI.');
+    throw new Error('That backup was made by a newer version of FitCheck.');
   }
 
   const database = await db();
@@ -151,7 +153,7 @@ function base64ToBlob(data: string, type: string): Blob {
 export async function runBackup(): Promise<string> {
   const blob = await exportBackup();
   const stamp = new Date().toISOString();
-  downloadBlob(blob, `outfitai-${stamp.slice(0, 10)}.json`);
+  downloadBlob(blob, `fitcheck-${stamp.slice(0, 10)}.json`);
   return stamp;
 }
 

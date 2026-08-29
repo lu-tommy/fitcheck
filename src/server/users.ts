@@ -1,4 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { readEnv } from './env';
 
 /**
  * Accounts, for a household.
@@ -7,7 +8,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
  * never stored — only a scrypt hash and its salt — so the file this reads from
  * does not hand anyone a way in if it leaks.
  *
- * Users come from OUTFITAI_USERS, a semicolon-separated list of
+ * Users come from FITCHECK_USERS, a semicolon-separated list of
  * `name:salt:hash` entries. `npm run add-user` prints one.
  */
 
@@ -41,7 +42,7 @@ let cached: Account[] | null = null;
 export function accounts(): Account[] {
   if (cached) return cached;
 
-  const raw = process.env.OUTFITAI_USERS ?? '';
+  const raw = readEnv('USERS') ?? '';
   cached = raw
     .split(';')
     .map((entry) => entry.trim())

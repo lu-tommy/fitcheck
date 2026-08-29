@@ -392,7 +392,7 @@ export default function HomePage() {
             <EmptyState
               icon={<Sparkles size={24} />}
               title="A few more pieces"
-              body="Add at least a top, a bottom and a pair of shoes and OutfitAI can start suggesting outfits."
+              body="Add at least a top, a bottom and a pair of shoes and FitCheck can start suggesting outfits."
               action={<ButtonLink href="/add">Add clothing</ButtonLink>}
             />
           </section>

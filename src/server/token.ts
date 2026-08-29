@@ -13,7 +13,14 @@
 const encoder = new TextEncoder();
 
 /** Named here rather than in session.ts, which pulls in node-only modules. */
-export const SESSION_COOKIE = 'outfitai_session';
+export const SESSION_COOKIE = 'fitcheck_session';
+
+/**
+ * What the cookie was called before the app was renamed. Read it as well as the
+ * current one and nobody who was signed in when the rename shipped gets bounced
+ * to the sign-in screen; the next sign-in writes the new name.
+ */
+export const LEGACY_SESSION_COOKIE = 'outfitai_session';
 
 export const MAX_AGE_SECONDS = 60 * 60 * 24 * 90;
 

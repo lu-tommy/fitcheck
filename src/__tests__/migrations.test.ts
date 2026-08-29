@@ -14,6 +14,9 @@ import { DB_VERSION, MIGRATIONS } from '@/db/migrations';
  * without dropping a single record.
  */
 
+// Still 'outfitai' on purpose after the rename to FitCheck — see the note in
+// db/index.ts. This assertion is what stops a future tidy-up from silently
+// abandoning every wardrobe already stored on a device.
 const DB_NAME = 'outfitai';
 
 async function wipe() {

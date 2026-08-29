@@ -20,14 +20,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 # Wardrobes live here; docker-compose mounts a volume over it.
-ENV OUTFITAI_DATA_DIR=/data
+ENV FITCHECK_DATA_DIR=/data
 
-RUN addgroup -g 1001 -S outfitai && adduser -u 1001 -S outfitai -G outfitai
+RUN addgroup -g 1001 -S fitcheck && adduser -u 1001 -S fitcheck -G fitcheck
 COPY --from=build /app/public ./public
-COPY --from=build --chown=outfitai:outfitai /app/.next/standalone ./
-COPY --from=build --chown=outfitai:outfitai /app/.next/static ./.next/static
-RUN mkdir -p /data && chown outfitai:outfitai /data
+COPY --from=build --chown=fitcheck:fitcheck /app/.next/standalone ./
+COPY --from=build --chown=fitcheck:fitcheck /app/.next/static ./.next/static
+RUN mkdir -p /data && chown fitcheck:fitcheck /data
 
-USER outfitai
+USER fitcheck
 EXPOSE 3000
 CMD ["node", "server.js"]

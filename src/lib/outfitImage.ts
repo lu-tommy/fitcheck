@@ -202,7 +202,7 @@ export async function renderOutfitImage(
   context.fillStyle = theme.muted;
   context.font = `500 28px ${FONT}`;
   context.textAlign = 'center';
-  context.fillText('Built from my own wardrobe · OutfitAI', WIDTH / 2, HEIGHT - 54);
+  context.fillText('Built from my own wardrobe · FitCheck', WIDTH / 2, HEIGHT - 54);
 
   opened.forEach((bitmap) => bitmap.close());
   return toBlob(element);
@@ -274,7 +274,7 @@ export async function renderComparisonImage(
   );
 
   context.font = `500 28px ${FONT}`;
-  context.fillText('OutfitAI', WIDTH / 2, HEIGHT - 54);
+  context.fillText('FitCheck', WIDTH / 2, HEIGHT - 54);
 
   opened.forEach((bitmap) => bitmap.close());
   return toBlob(element);

@@ -13,7 +13,7 @@ export type AuthStatus = 'loading' | 'unconfigured' | 'signed-out' | 'signed-in'
  * in rather than throwing someone out because the NAS was asleep.
  */
 
-const CACHE_KEY = 'outfitai:account';
+const CACHE_KEY = 'fitcheck:account';
 
 interface Cached {
   userId: string;
