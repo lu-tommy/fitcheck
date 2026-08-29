@@ -26,7 +26,7 @@ export interface RenderTheme {
 }
 
 export const LIGHT_THEME: RenderTheme = {
-  background: '#faf8f5',
+  background: '#f4f4f2',
   ink: '#1a1714',
   muted: '#7a716a',
   panel: '#ffffff',

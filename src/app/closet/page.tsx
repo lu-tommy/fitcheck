@@ -186,7 +186,7 @@ export default function ClosetPage() {
           </div>
         ) : !items.length ? (
           <EmptyState
-            icon={<Shirt size={26} />}
+            illustration
             title="Nothing here yet"
             body="Add the clothes you own and everything else in the app starts working."
             action={<ButtonLink href="/add">Add clothing</ButtonLink>}

@@ -48,7 +48,7 @@ export function OutfitStack({
 
       {accessories.length ? (
         <div className="tile flex items-center gap-3 p-3">
-          <span className="text-label w-16 shrink-0 text-[var(--text-faint)]">
+          <span className="text-label w-[5.25rem] shrink-0 leading-tight text-[var(--text-faint)]">
             {SLOT_LABEL.accessory}
           </span>
           <div className="flex min-w-0 flex-1 flex-wrap gap-2">
@@ -94,11 +94,10 @@ function Row({
       onClick={() => onSelect?.(item)}
       className="tile pressable flex w-full items-center gap-3 p-3 text-left"
     >
-      <span className="text-label w-16 shrink-0 text-[var(--text-faint)]">{label}</span>
+      <span className="text-label w-[5.25rem] shrink-0 leading-tight text-[var(--text-faint)]">{label}</span>
       <span
         className={cn(
           'size-16 shrink-0 overflow-hidden rounded-xl bg-[var(--surface-alt)]',
-          item.cutoutId && 'alpha-grid',
         )}
       >
         <ItemImage item={item} className="size-full" fit={item.cutoutId ? 'contain' : 'cover'} />

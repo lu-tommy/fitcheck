@@ -9,6 +9,15 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
+# .env holds the signing secret and the accounts and is NOT in git, so any
+# deploy that syncs the repo over this directory must exclude it:
+#
+#   rsync -a --delete --exclude=data --exclude='.env*' <source>/ .
+#
+# Without that exclusion --delete removes .env, compose refuses to start, and
+# recreating the secret would sign everybody out. The values also live in
+# .env.local, which is how the last one was recovered.
+
 if [ ! -f .env ]; then
   echo "No .env here. Create it first:"
   echo
@@ -40,7 +49,14 @@ if [ "$(stat -c %u data 2>/dev/null || echo 0)" != "1001" ]; then
 fi
 
 compose() {
-  if docker compose version >/dev/null 2>&1; then docker compose "$@";
+  if # Everything the image copies has to be readable by uid 1001, which is who the
+# container runs as. A transfer that lands files mode 600 root-owned produces a
+# 500 on exactly those files and nothing in the container log — the last one was
+# three icons, so the home-screen icon 500'd while every page worked.
+chmod -R a+rX . 2>/dev/null || true
+find data -type d -exec chmod 700 {} + 2>/dev/null || true
+
+docker compose version >/dev/null 2>&1; then docker compose "$@";
   else docker-compose "$@"; fi
 }
 

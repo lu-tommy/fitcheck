@@ -84,7 +84,8 @@ export default function OutfitsPage() {
           <HistoryList logs={wearLogs} outfits={outfits} />
         ) : !filtered.length ? (
           <EmptyState
-            icon={<Layers size={26} />}
+            illustration={tab !== 'favourites'}
+            icon={tab === 'favourites' ? <Layers size={26} /> : undefined}
             title={tab === 'favourites' ? 'No favourites yet' : 'No saved outfits'}
             body={
               tab === 'favourites'

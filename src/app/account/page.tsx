@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
 import { PageHeader } from '@/components/PageHeader';
+import { WardrobeMark } from '@/components/WardrobeMark';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/Feedback';
 import { Field, Input } from '@/components/ui/Field';
@@ -64,30 +65,28 @@ function SignIn() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col justify-center px-6 py-10">
-      <div className="mx-auto w-full max-w-sm">
+    <div className="relative flex min-h-dvh flex-col justify-center overflow-hidden px-6 py-10">
+      {/*
+        The one screen with nothing on it to look at, and the first one anyone
+        ever sees. A lay of the app's own line work, large and nearly invisible,
+        says what this is before a word is read — and it is drawn, so it costs
+        nothing to download and themes itself.
+      */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_60%_at_50%_-10%,var(--surface)_0%,transparent_65%)]"
+      />
+      <div className="relative mx-auto w-full max-w-sm">
         <header className="mb-8 text-center">
           <span
             aria-hidden
-            className="mx-auto mb-5 grid size-16 place-items-center rounded-[1.25rem] bg-[var(--brand)] shadow-[var(--shadow-card)]"
+            className="mx-auto mb-6 block w-full max-w-[15rem] rounded-[1.75rem] bg-[var(--brand)] px-8 py-7 shadow-[var(--shadow-card)]"
           >
-            <svg viewBox="0 0 512 512" className="size-9" role="presentation">
-              <path
-                d="M196 128h120l82 46-34 74-34-19v155a12 12 0 0 1-12 12H194a12 12 0 0 1-12-12V229l-34 19-34-74 82-46z"
-                fill="var(--on-brand)"
-              />
-              <path
-                d="M216 128c0 22 18 40 40 40s40-18 40-40"
-                fill="none"
-                stroke="var(--brand)"
-                strokeWidth="18"
-                strokeLinecap="round"
-              />
-            </svg>
+            <WardrobeMark className="text-[var(--on-brand)] opacity-90" />
           </span>
           <h1 className="text-display">OutfitAI</h1>
-          <p className="mt-2 text-[0.9375rem] leading-relaxed text-[var(--text-muted)]">
-            Outfits from the clothes you already own.
+          <p className="mx-auto mt-2 max-w-[19rem] text-[0.9375rem] leading-relaxed text-[var(--text-muted)]">
+            Outfits built only from the clothes hanging in your own wardrobe.
           </p>
         </header>
 

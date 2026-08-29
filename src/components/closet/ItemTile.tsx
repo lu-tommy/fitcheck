@@ -52,7 +52,7 @@ export function ItemTile({
         ) : null}
       </div>
       <div className="px-0.5 pt-2">
-        <p className="truncate text-[0.8125rem] font-medium">{item.name}</p>
+        <p className="clamp-2 text-[0.8125rem] leading-snug font-medium">{item.name}</p>
         <p className="truncate text-[0.75rem] text-[var(--text-muted)]">
           {subtitle ?? categoryLabel(item.category)}
         </p>

@@ -21,6 +21,7 @@ export function OutfitCollage({
   onChange,
   onSelect,
   onSwap,
+  ratio = '4 / 5',
   className,
 }: {
   items: ClothingItem[];
@@ -32,6 +33,12 @@ export function OutfitCollage({
    * right goes back, matching the arrows and the way a photo carousel reads.
    */
   onSwap?: (item: ClothingItem, direction: 1 | -1) => void;
+  /**
+   * Width-to-height of the lay. The default is a 4:5 plate; the home screen
+   * runs it edge to edge, where 4:5 is tall enough to push the decision under
+   * the tab bar, so it asks for something shallower.
+   */
+  ratio?: string;
   className?: string;
 }) {
   const surface = useRef<HTMLDivElement>(null);
@@ -98,11 +105,19 @@ export function OutfitCollage({
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
+      /*
+       * A stable hook for the browser harnesses. They used to reach for the
+       * aspect-ratio utility class, which meant a purely visual change — making
+       * the ratio a prop — silently broke six of them.
+       */
+      data-collage=""
+      style={{ aspectRatio: ratio }}
       className={cn(
-        'relative aspect-4/5 w-full overflow-hidden rounded-[var(--radius-card)]',
+        'relative w-full overflow-hidden rounded-[var(--radius-card)]',
         // A ground a shade darker than the card, so a cream shirt on a white
-        // tile still reads as an object rather than disappearing into it.
-        'border border-[var(--border)] bg-[var(--surface-sunken)]',
+        // tile still reads as an object rather than disappearing into it —
+        // lit from above, the way a garment photographed on a table is.
+        'bg-[var(--surface-alt)] bg-[radial-gradient(115%_80%_at_50%_0%,var(--surface)_0%,transparent_72%)]',
         editable && 'touch-none',
         className,
       )}
@@ -128,20 +143,37 @@ export function OutfitCollage({
               }}
             >
               {(() => {
+                /*
+                 * A cut-out is the garment and nothing else, so it sits
+                 * directly on the lay. Framing it in a white card with a ring
+                 * turned every piece into a paper coaster and hid the shape —
+                 * which is the one thing this picture exists to show.
+                 */
+                const cutout = Boolean(item.cutoutId);
                 const face = (
-                  <span className="block aspect-4/5 w-full bg-[var(--surface)]">
+                  <span
+                    className={cn(
+                      'block aspect-4/5 w-full',
+                      cutout ? 'bg-transparent' : 'bg-[var(--surface)]',
+                    )}
+                  >
                     <ItemImage
                       item={item}
                       className="size-full"
-                      fit={item.cutoutId ? 'contain' : 'cover'}
+                      fit={cutout ? 'contain' : 'cover'}
                       showLabel={entry.size > 0.2}
                     />
                   </span>
                 );
                 const shell = cn(
-                  'block w-full overflow-hidden rounded-xl select-none',
-                  'ring-1 ring-black/5 shadow-[0_10px_24px_-12px_rgba(0,0,0,0.45)]',
-                  selected && 'ring-2 ring-[var(--brand)]',
+                  'block w-full select-none',
+                  cutout
+                    ? 'overflow-visible'
+                    : 'overflow-hidden rounded-xl ring-1 ring-black/5 shadow-[0_10px_24px_-12px_rgba(0,0,0,0.45)]',
+                  selected &&
+                    (cutout
+                      ? 'rounded-xl ring-2 ring-[var(--brand)] ring-offset-4 ring-offset-transparent'
+                      : 'ring-2 ring-[var(--brand)]'),
                 );
 
                 if (!interactive) {

@@ -326,6 +326,29 @@ not the weather or the reader's units, so an outfit named in a notification
 would differ from the one the app shows on open. Saying "your outfit is ready"
 is honest; naming the wrong outfit is not.
 
+## How it looks
+
+The chrome is deliberately close to neutral, because the content of this app
+*is* colour. A warm cream ground — where this started — tints every garment
+photo in the wardrobe; paper and ink let the clothes be the only thing on screen
+with a hue. The one accent is a deep pine, dark enough to read as furniture
+rather than compete with a garment, and a colour almost nothing in a wardrobe
+actually is.
+
+Two typefaces, and nothing is set in both: Fraunces names things — screens,
+outfits, the pieces themselves — and Instrument Sans does the reading.
+
+The home screen leads with the outfit, edge to edge, because that is what the
+app is for. It used to be one white card in a stack of white cards, below an
+install prompt and a request for location — two chores in front of the first
+thing anyone opened the app to see. Those now sit underneath it.
+
+The demo wardrobe is drawn in the browser: forty-one silhouettes, one per
+category, on a transparent ground. That last part matters more than it sounds.
+Drawn onto a backdrop they were paper coasters on a mat; with an alpha channel
+they sit on the flat lay exactly the way a real cut-out does, which makes the
+demo an honest preview of the app with somebody's own clothes in it.
+
 ## Accessories
 
 "Accessory" is not one slot. A watch, a belt and a pair of sunglasses are worn

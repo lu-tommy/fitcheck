@@ -1,12 +1,27 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist } from 'next/font/google';
+import { Fraunces, Instrument_Sans } from 'next/font/google';
 
 import { AppShell } from '@/components/AppShell';
 import { THEME_STORAGE_KEY } from '@/store/preferences';
 
 import './globals.css';
 
-const sans = Geist({ variable: '--font-sans-stack', subsets: ['latin'] });
+/*
+ * Fraunces is variable on three axes. opsz is the one that matters — at a
+ * headline size the default text optical size looks blunt — and a little SOFT
+ * and WONK is what stops it reading as yet another elegant fashion serif.
+ */
+const display = Fraunces({
+  variable: '--font-display-stack',
+  subsets: ['latin'],
+  axes: ['SOFT', 'WONK', 'opsz'],
+  display: 'swap',
+});
+const sans = Instrument_Sans({
+  variable: '--font-sans-stack',
+  subsets: ['latin'],
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'OutfitAI',
@@ -21,8 +36,8 @@ export const viewport: Viewport = {
   maximumScale: 5,
   viewportFit: 'cover',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#faf8f5' },
-    { media: '(prefers-color-scheme: dark)', color: '#131211' },
+    { media: '(prefers-color-scheme: light)', color: '#f4f4f2' },
+    { media: '(prefers-color-scheme: dark)', color: '#101211' },
   ],
 };
 
@@ -37,7 +52,7 @@ const THEME_SCRIPT = `(function(){try{var m=localStorage.getItem(${JSON.stringif
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={`${sans.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" className={`${sans.variable} ${display.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
