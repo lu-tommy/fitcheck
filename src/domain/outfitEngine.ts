@@ -1,4 +1,5 @@
 import type {
+  Category,
   ClothingItem,
   GeneratedOutfit,
   OutfitRequest,
@@ -10,7 +11,13 @@ import type {
 } from '@/types';
 
 import { analyzeHarmony, hexForColorName } from './color';
-import { categoryMeta, formalityScore, slotOf } from './taxonomy';
+import {
+  MAX_ACCESSORIES,
+  accessoryPosition,
+  categoryMeta,
+  formalityScore,
+  slotOf,
+} from './taxonomy';
 import { currentSeason } from '@/lib/date';
 import { formatTemperatureLong } from '@/lib/format';
 
@@ -44,6 +51,14 @@ export interface EngineContext {
    * who set Fahrenheit is never told it is 18 degrees outside.
    */
   units?: Units;
+  /** Garments that suit the occasion, read from what the wearer typed. */
+  preferCategories?: Category[];
+  /**
+   * Garments that would be wrong for it. A heavy penalty rather than a ban:
+   * wearing the only shoes you own to the gym beats being sent out barefoot,
+   * and the explanation says when it had to settle.
+   */
+  avoidCategories?: Category[];
 }
 
 interface ScoredItem {
@@ -131,6 +146,9 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
   // Big enough to lose against any fresh alternative, small enough that a
   // resting piece still beats leaving the slot empty.
   if (context.restingItemIds?.includes(item.id)) score -= 150;
+
+  if (context.preferCategories?.includes(item.category)) score += 60;
+  if (context.avoidCategories?.includes(item.category)) score -= 400;
 
   if (request.includeItemIds.includes(item.id)) score += 500;
   if (request.excludeItemIds.includes(item.id)) score -= 1000;
@@ -220,7 +238,16 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
 
   const takeLayer = (slot: Slot) => {
     const candidate = pickForSlot(slot, scored, chosen, used);
-    if (candidate && !layerWouldClash(candidate, chosen, temperature)) take(candidate);
+    if (!candidate) return;
+    if (layerWouldClash(candidate, chosen, temperature)) return;
+    /*
+     * A layer is optional, so it must never be the reason a wrong garment gets
+     * worn. Top, bottom and shoes fall back to whatever exists — better the
+     * wrong shoes than none — but nobody needs a blazer to go running, and
+     * being a degree cold beats being dressed for the wrong thing entirely.
+     */
+    if (context.avoidCategories?.includes(candidate.category)) return;
+    take(candidate);
   };
 
   if (warmthOf(chosen) < needed && !chosen.some((item) => slotOf(item.category) === 'midlayer')) {
@@ -233,12 +260,31 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
     take(pickForSlot('headwear', scored, chosen, used));
   }
 
-  // One or two accessories, never more — the point is polish, not clutter.
-  const accessories = scored
+  /*
+   * Accessories, one per position and no more than three in total.
+   *
+   * Position is what competes: a watch and a belt and sunglasses all go on at
+   * once, but only one thing goes round a wrist. Three is the number stylists
+   * use — past that, pieces stop supporting an outfit and start arguing with it.
+   */
+  const takenPositions = new Set(
+    chosen
+      .filter((item) => slotOf(item.category) === 'accessory')
+      .map((item) => accessoryPosition(item.category)),
+  );
+
+  scored
     .filter((entry) => slotOf(entry.item.category) === 'accessory' && !used.has(entry.item.id))
     .sort((a, b) => b.score - a.score)
-    .slice(0, 2);
-  accessories.forEach((entry) => take(entry.item));
+    .forEach((entry) => {
+      if (chosen.filter((item) => slotOf(item.category) === 'accessory').length >= MAX_ACCESSORIES) {
+        return;
+      }
+      const position = accessoryPosition(entry.item.category);
+      if (takenPositions.has(position)) return;
+      takenPositions.add(position);
+      take(entry.item);
+    });
 
   const harmony = analyzeHarmony(
     chosen.map((item) => item.primaryColorHex || hexForColorName(item.primaryColor)),
@@ -268,7 +314,7 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
     explanation: localExplanation(chosen, context, temperature, needed),
     colorNotes: harmony.summary,
     alternatives,
-    warnings: missingSlotWarnings(chosen),
+    warnings: missingSlotWarnings(chosen, context.avoidCategories),
   };
 }
 
@@ -296,13 +342,28 @@ function describeShift(candidate: ClothingItem, current?: ClothingItem): string 
   return 'a different';
 }
 
-function missingSlotWarnings(chosen: ClothingItem[]): string[] | undefined {
+function missingSlotWarnings(
+  chosen: ClothingItem[],
+  avoidCategories?: Category[],
+): string[] | undefined {
   const slots = new Set(chosen.map((item) => slotOf(item.category)));
   const warnings: string[] = [];
   const hasFullbody = slots.has('fullbody');
   if (!hasFullbody && !slots.has('top')) warnings.push('No suitable top was available.');
   if (!hasFullbody && !slots.has('bottom')) warnings.push('No suitable bottom was available.');
   if (!slots.has('footwear')) warnings.push('No suitable shoes were available.');
+
+  // Being honest about a compromise is the whole promise: it only ever uses
+  // clothes you own, so sometimes the right thing is not in the wardrobe.
+  const compromises = chosen.filter((item) => avoidCategories?.includes(item.category));
+  if (compromises.length) {
+    warnings.push(
+      `You do not own anything better suited than ${compromises
+        .map((item) => item.name.toLowerCase())
+        .join(' and ')} for this.`,
+    );
+  }
+
   return warnings.length ? warnings : undefined;
 }
 
@@ -353,4 +414,60 @@ function localExplanation(
     : '';
 
   return `${opener} ${weatherNote}${formalityNote}`;
+}
+
+
+/**
+ * The other things she could wear in one slot, best first.
+ *
+ * Includes what is currently on, so stepping forwards and backwards through the
+ * list is a simple index move and always lands somewhere sensible.
+ */
+export function slotAlternatives(
+  context: EngineContext,
+  currentIds: string[],
+  slotItemId: string,
+): ClothingItem[] {
+  const index = new Map(context.closet.map((item) => [item.id, item]));
+  const current = index.get(slotItemId);
+  if (!current) return [];
+
+  const slot = slotOf(current.category);
+  const position = accessoryPosition(current.category);
+  const otherSlots = currentIds.filter((id) => id !== slotItemId);
+  const temperature = context.weather?.temperature ?? context.request.temperature ?? 18;
+
+  return context.closet
+    .filter((item) => slotOf(item.category) === slot)
+    // Within accessories, only things worn in the same place are alternatives.
+    .filter((item) => slot !== 'accessory' || accessoryPosition(item.category) === position)
+    .filter((item) => !item.archived)
+    .filter((item) => !otherSlots.includes(item.id))
+    .filter((item) => (context.request.cleanOnly ? item.laundry === 'clean' : true))
+    .filter((item) => !context.request.excludeItemIds.includes(item.id))
+    .map((item) => ({ item, score: scoreItem(item, context, temperature) }))
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.item);
+}
+
+/**
+ * Step one slot forwards or backwards and leave the rest of the outfit alone.
+ *
+ * Rerolling everything to change the shoes throws away the four pieces she
+ * liked. The list wraps, so there is always somewhere to go and never a dead
+ * arrow — and with only one garment in a slot it simply stays put.
+ */
+export function cycleSlot(
+  context: EngineContext,
+  currentIds: string[],
+  slotItemId: string,
+  direction: 1 | -1,
+): string[] {
+  const options = slotAlternatives(context, currentIds, slotItemId);
+  if (options.length < 2) return currentIds;
+
+  const at = options.findIndex((item) => item.id === slotItemId);
+  const next = options[(at + direction + options.length) % options.length];
+
+  return currentIds.map((id) => (id === slotItemId ? next.id : id));
 }

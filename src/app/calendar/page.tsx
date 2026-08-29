@@ -137,7 +137,7 @@ export default function CalendarPage() {
             {WEEKDAYS.map((day, index) => (
               <span
                 key={`${day}-${index}`}
-                className="text-center text-[0.6875rem] font-semibold text-[var(--text-faint)]"
+                className="text-center text-[0.75rem] font-semibold text-[var(--text-faint)]"
               >
                 {day}
               </span>

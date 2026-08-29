@@ -109,6 +109,75 @@ export const SLOT_LABEL: Record<Slot, string> = {
 };
 
 /**
+ * Where on the body an accessory is worn.
+ *
+ * "Accessory" is not one slot. A watch, a belt and a pair of sunglasses are
+ * worn together, not instead of one another — treating them as a single bucket
+ * means the app offers you a belt as an alternative to your watch, and quietly
+ * caps a whole category at two pieces. Position is what actually competes:
+ * only one thing goes round a wrist at a time.
+ */
+export type AccessoryPosition =
+  | 'eyes'
+  | 'neck'
+  | 'wrist'
+  | 'finger'
+  | 'waist'
+  | 'carried'
+  | 'hands'
+  | 'other';
+
+const ACCESSORY_POSITION: Partial<Record<Category, AccessoryPosition>> = {
+  sunglasses: 'eyes',
+  necklace: 'neck',
+  scarf: 'neck',
+  tie: 'neck',
+  watch: 'wrist',
+  bracelet: 'wrist',
+  ring: 'finger',
+  belt: 'waist',
+  bag: 'carried',
+  gloves: 'hands',
+  other: 'other',
+};
+
+export function accessoryPosition(category: Category): AccessoryPosition {
+  return ACCESSORY_POSITION[category] ?? 'other';
+}
+
+export const ACCESSORY_POSITION_LABEL: Record<AccessoryPosition, string> = {
+  eyes: 'Eyewear',
+  neck: 'Neck',
+  wrist: 'Wrist',
+  finger: 'Rings',
+  waist: 'Waist',
+  carried: 'Bag',
+  hands: 'Hands',
+  other: 'Accessory',
+};
+
+/** The order accessories are offered and drawn in, roughly head to hands. */
+export const ACCESSORY_POSITION_ORDER: AccessoryPosition[] = [
+  'eyes',
+  'neck',
+  'wrist',
+  'finger',
+  'waist',
+  'carried',
+  'hands',
+  'other',
+];
+
+/**
+ * How many accessories an outfit should carry.
+ *
+ * The rule stylists actually use is three: past that, pieces stop supporting
+ * the outfit and start competing with it. One per position on top of that,
+ * because two watches is not a look.
+ */
+export const MAX_ACCESSORIES = 3;
+
+/**
  * The order a wardrobe is browsed in, which is not the order an outfit is
  * stacked in. SLOT_ORDER runs head to toe because that is how a look is
  * assembled; a person looking for something to wear starts at tops.

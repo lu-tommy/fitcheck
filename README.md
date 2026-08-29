@@ -34,6 +34,14 @@ it prints. It installs to the home screen as a PWA.
 
 ## What runs where
 
+**What you type changes what you get.** "I'm going for a run" and "first day at
+the new office" produce different clothes, from a keyword table of occasions
+that each say how dressed up they are, which styles suit them, and which
+garments belong or definitely do not. It is a matcher, not a model: it runs
+instantly, works offline, and when it does not recognise a sentence it says
+nothing rather than guessing. When the wardrobe cannot cover the occasion it
+says that too, rather than quietly putting a blazer on you for the gym.
+
 There is no AI in this app and no API key to buy. Outfits, packing lists,
 colour reasoning and the wash planner all come from rules in `src/domain`, which
 run instantly, work offline, and can be read and argued with. Weather comes from
@@ -188,6 +196,7 @@ src/
     memories      What the wear log is for — a year ago today, and so on
     weekPlanner   Seven days at once, each against its own forecast
     shopping      Whether a piece you are thinking of buying earns its place
+    intent        Reading what somebody typed — a run, a wedding, a first day
     color         HSL harmony analysis, neutrals, pairing suggestions
     outfitEngine  The rule-based outfit builder (and the AI fallback)
     packingEngine Re-wear planner
@@ -229,6 +238,15 @@ backdrop, and pixels matching it are discarded before the middle of the frame is
 binned. That is what stops a pair of shoes photographed on a duvet coming back
 the colour of the duvet. If discarding the backdrop leaves almost nothing, the
 garment fills the frame and *is* that colour, so the filter is dropped.
+
+## Changing one piece
+
+The suggestion is a starting point, not a verdict. Each piece can be stepped
+forwards or backwards through the other things that would fill that slot —
+arrows on every row, and a sideways swipe on the picture itself, because a swipe
+is invisible until somebody finds it and a mouse has no swipe at all. Only the
+piece you touch changes; the rest of the outfit stays put. A slot with one
+garment in it says "only one" rather than offering a dead arrow.
 
 ## The outfit as a picture
 
@@ -307,6 +325,23 @@ The notification is a nudge, not a prediction. The server holds the wardrobe but
 not the weather or the reader's units, so an outfit named in a notification
 would differ from the one the app shows on open. Saying "your outfit is ready"
 is honest; naming the wrong outfit is not.
+
+## Accessories
+
+"Accessory" is not one slot. A watch, a belt and a pair of sunglasses are worn
+together, not instead of one another, so they are modelled by **where on the
+body they go** — eyes, neck, wrist, fingers, waist, carried, hands. That is what
+actually competes: only one thing goes round a wrist at a time.
+
+Three consequences, all of which were bugs before:
+
+- Stepping through alternatives for a watch offers watches and bracelets, not
+  belts.
+- An outfit can carry several accessories at once, one per position — capped at
+  three, which is the number stylists use before pieces stop supporting an
+  outfit and start arguing with it.
+- The closet shelves them by position too, so a drawer of glasses, rings,
+  watches and belts is browsable rather than one endless row.
 
 ## Archiving, planning, remembering
 

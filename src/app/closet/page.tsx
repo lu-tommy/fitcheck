@@ -21,13 +21,15 @@ import {
   type ClosetSort,
 } from '@/domain/filters';
 import {
+  ACCESSORY_POSITION_LABEL,
+  ACCESSORY_POSITION_ORDER,
   SEASONS,
   SEASON_LABEL,
   SLOT_BROWSE_ORDER,
   SLOT_LABEL_PLURAL,
-  SLOT_ORDER,
   STYLES,
   STYLE_LABEL,
+  accessoryPosition,
   slotOf,
 } from '@/domain/taxonomy';
 import { cn } from '@/lib/cn';
@@ -70,6 +72,36 @@ export default function ClosetPage() {
    */
   const grouped =
     !debouncedQuery && filters.slots.length === 0 && filters.sort === 'recent' && visible.length > 8;
+
+  /*
+   * One shelf per kind — and accessories get a shelf each by where they are
+   * worn, because a single row holding glasses, three rings, two watches and a
+   * belt is a drawer, not a shelf.
+   */
+  const shelves = useMemo(() => {
+    const out: { key: string; label: string; slot: Slot; items: typeof visible }[] = [];
+    SLOT_BROWSE_ORDER.forEach((slot) => {
+      const inSlot = visible.filter((item) => slotOf(item.category) === slot);
+      if (!inSlot.length) return;
+
+      if (slot !== 'accessory') {
+        out.push({ key: slot, label: SLOT_LABEL_PLURAL[slot], slot, items: inSlot });
+        return;
+      }
+
+      ACCESSORY_POSITION_ORDER.forEach((position) => {
+        const atPosition = inSlot.filter((item) => accessoryPosition(item.category) === position);
+        if (!atPosition.length) return;
+        out.push({
+          key: `accessory-${position}`,
+          label: ACCESSORY_POSITION_LABEL[position],
+          slot,
+          items: atPosition,
+        });
+      });
+    });
+    return out;
+  }, [visible]);
   const update = (patch: Partial<ClosetFilters>) =>
     setFilters((current) => ({ ...current, ...patch }));
   const toggle = <T,>(list: T[], value: T): T[] =>
@@ -191,19 +223,16 @@ export default function ClosetPage() {
                * and the heading opens that shelf in full.
                */
               <div className="space-y-6">
-                {SLOT_BROWSE_ORDER.map((slot) => {
-                  const inSlot = visible.filter((item) => slotOf(item.category) === slot);
+                {shelves.map(({ key, label, items: inSlot, slot }) => {
                   if (!inSlot.length) return null;
                   return (
-                    <section key={slot}>
+                    <section key={key}>
                       <button
                         type="button"
                         onClick={() => update({ slots: [slot] })}
                         className="pressable mb-2.5 flex w-full items-baseline justify-between gap-3"
                       >
-                        <span className="text-label text-[var(--text-muted)]">
-                          {SLOT_LABEL_PLURAL[slot]}
-                        </span>
+                        <span className="text-label text-[var(--text-muted)]">{label}</span>
                         <span className="flex items-center gap-1 text-[0.75rem] text-[var(--text-faint)]">
                           {inSlot.length}
                           <ChevronRight size={13} />

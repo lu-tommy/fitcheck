@@ -20,12 +20,18 @@ export function OutfitCollage({
   layout,
   onChange,
   onSelect,
+  onSwap,
   className,
 }: {
   items: ClothingItem[];
   layout?: CollagePlacement[];
   onChange?: (next: CollagePlacement[]) => void;
   onSelect?: (item: ClothingItem) => void;
+  /**
+   * Swipe a piece sideways to step through that slot. Left goes forwards and
+   * right goes back, matching the arrows and the way a photo carousel reads.
+   */
+  onSwap?: (item: ClothingItem, direction: 1 | -1) => void;
   className?: string;
 }) {
   const surface = useRef<HTMLDivElement>(null);
@@ -34,6 +40,9 @@ export function OutfitCollage({
   );
   const moved = useRef(false);
   const [active, setActive] = useState<string | null>(null);
+  /** Where a swipe started, and how far it has gone, per piece. */
+  const swipe = useRef<{ id: string; x: number } | null>(null);
+  const [swipedAway, setSwipedAway] = useState<string | null>(null);
 
   const placements = useMemo(() => resolveLayout(items, layout), [items, layout]);
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
@@ -44,7 +53,7 @@ export function OutfitCollage({
    * screen, for one — and a button inside a button is invalid HTML that React
    * refuses to hydrate.
    */
-  const interactive = editable || Boolean(onSelect);
+  const interactive = editable || Boolean(onSelect) || Boolean(onSwap);
 
   const fraction = useCallback((event: React.PointerEvent) => {
     const rect = surface.current?.getBoundingClientRect();
@@ -130,7 +139,7 @@ export function OutfitCollage({
                   </span>
                 );
                 const shell = cn(
-                  'block w-full overflow-hidden rounded-xl',
+                  'block w-full overflow-hidden rounded-xl select-none',
                   'ring-1 ring-black/5 shadow-[0_10px_24px_-12px_rgba(0,0,0,0.45)]',
                   selected && 'ring-2 ring-[var(--brand)]',
                 );
@@ -147,7 +156,32 @@ export function OutfitCollage({
                   <button
                     type="button"
                     aria-label={item.name}
+                    style={{
+                      /*
+                       * Without this the browser claims a sideways drag as a
+                       * pan, cancels the pointer sequence, and the swipe never
+                       * completes. pan-y keeps vertical scrolling working while
+                       * horizontal movement stays ours.
+                       */
+                      touchAction: onSwap ? 'pan-y' : undefined,
+                      ...(swipedAway === entry.itemId
+                        ? {
+                            transition: 'transform 180ms ease, opacity 180ms ease',
+                            transform: `translateX(${swipedAway === entry.itemId ? '-40%' : '0'})`,
+                            opacity: 0.25,
+                          }
+                        : null),
+                    }}
                     onPointerDown={(event) => {
+                      if (onSwap) {
+                        // Also stops the browser starting a text selection,
+                        // which cancels the gesture the same way.
+                        event.preventDefault();
+                        swipe.current = { id: entry.itemId, x: event.clientX };
+                        // Without capture the pointer leaves the tile partway
+                        // through the swipe and pointerup never arrives here.
+                        event.currentTarget.setPointerCapture?.(event.pointerId);
+                      }
                       if (!editable) return;
                       moved.current = false;
                       const { x, y } = fraction(event);
@@ -160,8 +194,28 @@ export function OutfitCollage({
                       setActive(entry.itemId);
                       (event.target as Element).setPointerCapture?.(event.pointerId);
                     }}
+                    onPointerCancel={() => {
+                      swipe.current = null;
+                    }}
+                    onPointerUp={(event) => {
+                      const start = swipe.current;
+                      swipe.current = null;
+                      if (!onSwap || !start || start.id !== entry.itemId) return;
+                      // A deliberate sideways flick, not a tap and not a drag.
+                      if (Math.abs(event.clientX - start.x) < 48) return;
+                      const direction = event.clientX < start.x ? 1 : -1;
+                      moved.current = true;
+                      setSwipedAway(entry.itemId);
+                      setTimeout(() => {
+                        setSwipedAway(null);
+                        onSwap(item, direction);
+                      }, 170);
+                    }}
                     onClick={() => {
-                      if (moved.current) return;
+                      if (moved.current) {
+                        moved.current = false;
+                        return;
+                      }
                       if (editable) setActive(entry.itemId);
                       else onSelect?.(item);
                     }}

@@ -194,7 +194,7 @@ export function MultiCrop({
                   (event.target as Element).setPointerCapture?.(event.pointerId);
                 }}
               >
-                <span className="absolute -top-px -left-px bg-[var(--brand)] px-1.5 py-0.5 text-[0.6875rem] font-semibold text-[var(--on-brand)]">
+                <span className="absolute -top-px -left-px bg-[var(--brand)] px-1.5 py-0.5 text-[0.75rem] font-semibold text-[var(--on-brand)]">
                   {index + 1}
                 </span>
 

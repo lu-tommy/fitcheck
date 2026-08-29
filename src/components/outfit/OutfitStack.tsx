@@ -1,6 +1,13 @@
 'use client';
 
-import { SLOT_LABEL, SLOT_ORDER, slotOf } from '@/domain/taxonomy';
+import {
+  ACCESSORY_POSITION_LABEL,
+  ACCESSORY_POSITION_ORDER,
+  SLOT_LABEL,
+  SLOT_ORDER,
+  accessoryPosition,
+  slotOf,
+} from '@/domain/taxonomy';
 import { cn } from '@/lib/cn';
 import type { ClothingItem, Slot } from '@/types';
 
@@ -45,11 +52,18 @@ export function OutfitStack({
             {SLOT_LABEL.accessory}
           </span>
           <div className="flex min-w-0 flex-1 flex-wrap gap-2">
-            {accessories.map((item) => (
+            {[...accessories]
+              .sort(
+                (a, b) =>
+                  ACCESSORY_POSITION_ORDER.indexOf(accessoryPosition(a.category)) -
+                  ACCESSORY_POSITION_ORDER.indexOf(accessoryPosition(b.category)),
+              )
+              .map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => onSelect?.(item)}
+                title={ACCESSORY_POSITION_LABEL[accessoryPosition(item.category)]}
                 className="pressable flex items-center gap-2 rounded-xl bg-[var(--surface-alt)] py-1 pr-3 pl-1"
               >
                 <span className="size-8 overflow-hidden rounded-lg">

@@ -8,6 +8,7 @@ import {
   CATEGORIES,
   FORMALITY_LABEL,
   FORMALITY_ORDER,
+  MATERIALS,
   PATTERNS,
   PATTERN_LABEL,
   SEASONS,
@@ -20,6 +21,7 @@ import { COLOR_NAMES, swatches } from '@/lib/palette';
 import { titleCase } from '@/lib/format';
 import type { CareInstructions, Category, Formality, Pattern, Season, Style } from '@/types';
 
+import { BrandPicker } from '@/components/closet/BrandPicker';
 import { CareForm, EMPTY_CARE } from '@/components/closet/CareForm';
 import { Chip } from '@/components/ui/Chip';
 import { Field, Input, Select, Textarea } from '@/components/ui/Field';
@@ -63,9 +65,12 @@ export const EMPTY_DRAFT: ItemDraft = {
 export function ItemForm({
   draft,
   onChange,
+  knownBrands = [],
 }: {
   draft: ItemDraft;
   onChange: (patch: Partial<ItemDraft>) => void;
+  /** Brands already in the wardrobe, so the same label is not typed twice. */
+  knownBrands?: string[];
 }) {
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((entry) => entry !== value) : [...list, value];
@@ -174,22 +179,26 @@ export function ItemForm({
         </Select>
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Material">
-          <Input
-            value={draft.material}
-            onChange={(event) => onChange({ material: event.target.value })}
-            placeholder="Cotton"
-          />
-        </Field>
-        <Field label="Brand">
-          <Input
-            value={draft.brand}
-            onChange={(event) => onChange({ brand: event.target.value })}
-            placeholder="Optional"
-          />
-        </Field>
+      <div>
+        <span className="text-label mb-2 block text-[var(--text-muted)]">Material</span>
+        <div className="flex flex-wrap gap-2">
+          {MATERIALS.map((material) => (
+            <Chip
+              key={material}
+              selected={draft.material === material}
+              onClick={() => onChange({ material: draft.material === material ? '' : material })}
+            >
+              {material}
+            </Chip>
+          ))}
+        </div>
       </div>
+
+      <BrandPicker
+        value={draft.brand}
+        known={knownBrands}
+        onChange={(brand) => onChange({ brand })}
+      />
 
       <Field label="Formality">
         <Select

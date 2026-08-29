@@ -42,7 +42,7 @@ export default function ErrorScreen({
         </ButtonLink>
       </div>
       {error.digest ? (
-        <p className="font-mono text-[0.6875rem] text-[var(--text-faint)]">{error.digest}</p>
+        <p className="font-mono text-[0.75rem] text-[var(--text-faint)]">{error.digest}</p>
       ) : null}
     </div>
   );

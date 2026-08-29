@@ -124,7 +124,7 @@ function TabBar({ pathname }: { pathname: string }) {
                 >
                   <Icon size={'accent' in tab && tab.accent ? 19 : 22} strokeWidth={active ? 2.2 : 1.8} />
                 </span>
-                <span className="text-[0.6875rem] font-medium">{tab.label}</span>
+                <span className="text-[0.75rem] font-medium">{tab.label}</span>
               </Link>
             </li>
           );

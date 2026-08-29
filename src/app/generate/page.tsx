@@ -14,6 +14,7 @@ import { EmptyState, SectionHeader, Spinner } from '@/components/ui/Feedback';
 import { Field, Select, Textarea } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
 import { analyzeHarmony } from '@/domain/color';
+import { readIntent } from '@/domain/intent';
 import { buildOutfitLocally } from '@/domain/outfitEngine';
 import {
   FORMALITY_LABEL,
@@ -107,6 +108,9 @@ function Generator() {
     [resultItems],
   );
 
+  /** What the typed sentence means, if anything. Updated as she types. */
+  const intent = useMemo(() => readIntent(prompt || occasion || ''), [prompt, occasion]);
+
   async function run(options?: { fresh?: boolean }) {
     if (!items.length) return;
     setBusy(true);
@@ -114,22 +118,27 @@ function Generator() {
     const generated = { outfit: buildOutfitLocally({
       request: {
         prompt: prompt.trim() || occasion || 'Something good for today',
-        occasion,
-        formality: formality || undefined,
+        occasion: occasion ?? intent?.occasion,
+        // An explicit choice always beats a reading of the sentence.
+        formality: formality || intent?.formality,
         style: style || undefined,
         colorPreference: colorPreference || undefined,
-        temperature: weather?.temperature,
+        temperature: intent?.temperature ?? weather?.temperature,
         weatherCondition: weather?.condition,
         includeItemIds: includeIds,
         excludeItemIds: excludeIds,
         cleanOnly,
       },
       closet: cleanOnly ? items.filter((item) => item.laundry === 'clean') : items,
-      weather,
-      preferredStyles: preferences.preferredStyles,
+      // A stated temperature in the sentence outranks the forecast: she knows
+      // whether she will be indoors.
+      weather: intent?.temperature != null ? null : weather,
+      preferredStyles: style ? [style] : (intent?.styles ?? preferences.preferredStyles),
       avoidColors: preferences.avoidColors,
       units: preferences.units,
       restingItemIds: resting,
+      preferCategories: intent?.prefer,
+      avoidCategories: intent?.avoid,
     }) };
     setResult(generated);
     setRival(null);
@@ -153,21 +162,23 @@ function Generator() {
     const generated = { outfit: buildOutfitLocally({
       request: {
         prompt: prompt.trim() || occasion || 'Something good for today',
-        occasion,
-        formality: formality || undefined,
+        occasion: occasion ?? intent?.occasion,
+        formality: formality || intent?.formality,
         style: style || undefined,
         colorPreference: colorPreference || undefined,
-        temperature: weather?.temperature,
+        temperature: intent?.temperature ?? weather?.temperature,
         weatherCondition: weather?.condition,
         includeItemIds: includeIds,
         excludeItemIds: [...excludeIds, ...result.outfit.itemIds],
         cleanOnly,
       },
       closet: pool,
-      weather,
-      preferredStyles: preferences.preferredStyles,
+      weather: intent?.temperature != null ? null : weather,
+      preferredStyles: style ? [style] : (intent?.styles ?? preferences.preferredStyles),
       avoidColors: preferences.avoidColors,
       units: preferences.units,
+      preferCategories: intent?.prefer,
+      avoidCategories: intent?.avoid,
     }) };
     setBusy(false);
     if (generated.outfit.itemIds.length < 2) {
@@ -436,6 +447,13 @@ function Generator() {
             placeholder="First date at a wine bar, walking there, might get cold later"
           />
         </Field>
+
+        {intent ? (
+          <p className="flex items-start gap-2 rounded-2xl bg-[var(--info-soft)] p-3 text-[0.8125rem] leading-relaxed text-[var(--info)]">
+            <Sparkles size={14} className="mt-0.5 shrink-0" />
+            {intent.summary}.
+          </p>
+        ) : null}
 
         <div>
           <div className="flex flex-wrap gap-2">

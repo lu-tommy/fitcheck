@@ -11,18 +11,23 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { OutfitPill } from '@/components/outfit/OutfitCard';
 import { MemoryCard } from '@/components/MemoryCard';
 import { SafetyCard } from '@/components/SafetyCard';
 import { OutfitCollage } from '@/components/outfit/OutfitCollage';
+import { SlotPicker } from '@/components/outfit/SlotPicker';
 import { OutfitStack } from '@/components/outfit/OutfitStack';
 import { WeatherCard } from '@/components/WeatherCard';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { EmptyState, SectionHeader } from '@/components/ui/Feedback';
-import { buildOutfitLocally } from '@/domain/outfitEngine';
+import { buildOutfitLocally, cycleSlot, slotAlternatives } from '@/domain/outfitEngine';
 import { demoWardrobe } from '@/domain/seed';
+import { putPhoto } from '@/db';
+import { demoPhoto } from '@/lib/demoImages';
+import { createId } from '@/lib/id';
+import { nowIso } from '@/lib/date';
 import { formatFriendlyDate, todayKey } from '@/lib/date';
 import { pluralize } from '@/lib/format';
 import { useActiveItems, useCloset, useResolvedItems } from '@/store/closet';
@@ -31,7 +36,7 @@ import { usePlanner } from '@/store/planner';
 import { usePreferences } from '@/store/preferences';
 import { toast } from '@/store/toast';
 import { useWeather } from '@/store/weather';
-import type { Outfit } from '@/types';
+import type { ClothingItem, Outfit } from '@/types';
 
 export default function HomePage() {
   const router = useRouter();
@@ -86,8 +91,55 @@ export default function HomePage() {
     wornToday,
   ]);
 
-  const suggestionItems = useResolvedItems(suggestion?.itemIds);
+  /*
+   * The suggestion is a starting point, not a verdict. Swiping one piece away
+   * replaces only that slot and keeps the rest, because rerolling the whole
+   * outfit to change the shoes throws away the four pieces she liked.
+   */
+  const [swappedIds, setSwappedIds] = useState<string[] | null>(null);
+  const shownIds = swappedIds ?? suggestion?.itemIds;
+  const suggestionItems = useResolvedItems(shownIds);
   const plannedItems = useResolvedItems(plannedOutfit?.itemIds);
+
+  const engineContext = useMemo(
+    () => ({
+      request: {
+        prompt: 'Something for today',
+        includeItemIds: [],
+        excludeItemIds: [],
+        cleanOnly: true,
+      },
+      closet: items,
+      weather,
+      preferredStyles: preferences.preferredStyles,
+      avoidColors: preferences.avoidColors,
+      units: preferences.units,
+    }),
+    [items, weather, preferences.preferredStyles, preferences.avoidColors, preferences.units],
+  );
+
+  // A fresh suggestion replaces anything swapped by hand.
+  useEffect(() => {
+    setSwappedIds(null);
+  }, [suggestion?.itemIds.join(',')]);
+
+  /** How many garments could fill each slot, so a lone option reads as fixed. */
+  const optionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    (shownIds ?? []).forEach((id) => {
+      counts[id] = slotAlternatives(engineContext, shownIds ?? [], id).length;
+    });
+    return counts;
+  }, [engineContext, shownIds]);
+
+  const cycle = (item: ClothingItem, direction: 1 | -1) => {
+    const next = cycleSlot(engineContext, shownIds ?? [], item.id, direction);
+    if (next.join(',') === (shownIds ?? []).join(',')) {
+      toast('Nothing else in your closet fits that slot');
+      return;
+    }
+    setSwappedIds(next);
+  };
   const wornItems = useResolvedItems(wornToday?.itemIds);
   // Shoes, outerwear and accessories survive a wear, so "logged" and "in the
   // wash" are different numbers and the card should not conflate them.
@@ -107,16 +159,29 @@ export default function HomePage() {
 
   async function loadDemo() {
     setLoadingDemo(true);
-    await addItems(demoWardrobe());
+    const drafts = demoWardrobe();
+
+    // Give every demo piece an illustration, drawn here rather than shipped.
+    const withPictures = await Promise.all(
+      drafts.map(async (draft) => {
+        const blob = await demoPhoto(draft.category, draft.primaryColorHex);
+        if (!blob) return draft;
+        const photoId = createId('photo');
+        await putPhoto({ id: photoId, blob, width: 400, height: 500, createdAt: nowIso() });
+        return { ...draft, photoId };
+      }),
+    );
+
+    await addItems(withPictures);
     setLoadingDemo(false);
-    toast('Demo wardrobe loaded — 22 pieces', { tone: 'success' });
+    toast(`Demo wardrobe loaded — ${withPictures.length} pieces`, { tone: 'success' });
   }
 
   async function saveSuggestion() {
     if (!suggestion) return;
     const outfit = await saveOutfit({
       name: suggestion.name,
-      itemIds: suggestion.itemIds,
+      itemIds: shownIds ?? suggestion.itemIds,
       explanation: suggestion.explanation,
       colorNotes: suggestion.colorNotes,
       source: 'ai',
@@ -275,7 +340,9 @@ export default function HomePage() {
               <OutfitCollage
                 items={suggestionItems}
                 onSelect={(item) => router.push(`/closet/${item.id}`)}
+                onSwap={(item, direction) => cycle(item, direction)}
               />
+
               <div className="mt-3 flex gap-2">
                 <Button full icon={<Check size={17} />} onClick={saveSuggestion}>
                   Wear this
@@ -284,6 +351,16 @@ export default function HomePage() {
                   Something else
                 </ButtonLink>
               </div>
+
+              <SlotPicker
+                items={suggestionItems}
+                onCycle={cycle}
+                optionCounts={optionCounts}
+                className="mt-3 border-t border-[var(--border)] pt-1"
+              />
+              <p className="mt-1 text-center text-[0.75rem] text-[var(--text-faint)]">
+                Swipe a piece on the picture, or use the arrows, to change just that one
+              </p>
               <p className="mt-3 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
                 {suggestion.explanation}
               </p>

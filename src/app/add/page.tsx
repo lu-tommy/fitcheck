@@ -2,13 +2,14 @@
 
 import { Camera, ImagePlus, Loader2, PenLine, Scissors, Sparkles, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { EMPTY_DRAFT, ItemForm, draftLabel, type ItemDraft } from '@/components/closet/ItemForm';
 import { MultiCrop } from '@/components/closet/MultiCrop';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { hexForColorName } from '@/domain/color';
+import { availableBrands } from '@/domain/filters';
 import { categoryLabel } from '@/domain/taxonomy';
 import { putPhoto } from '@/db';
 import { removeBackground } from '@/lib/backgroundRemoval';
@@ -39,6 +40,8 @@ interface Pending {
 export default function AddPage() {
   const router = useRouter();
   const addItems = useCloset((state) => state.addItems);
+  const closet = useCloset((state) => state.items);
+  const knownBrands = useMemo(() => availableBrands(closet), [closet]);
   const backgroundRemoval = usePreferences((state) => state.preferences.backgroundRemoval);
   const [queue, setQueue] = useState<Pending[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
@@ -334,7 +337,7 @@ export default function AddPage() {
                 'In a hurry? Lay several things out together and use “one photo, several pieces”.',
               ].map((tip, index) => (
                 <li key={tip} className="flex gap-3 text-[0.875rem] leading-relaxed">
-                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--surface-alt)] text-[0.6875rem] font-semibold text-[var(--text-muted)]">
+                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--surface-alt)] text-[0.75rem] font-semibold text-[var(--text-muted)]">
                     {index + 1}
                   </span>
                   <span className="text-[var(--text-muted)]">{tip}</span>
@@ -394,7 +397,7 @@ export default function AddPage() {
                         {titleCase(entry.draft.primaryColor)}
                       </p>
                       {entry.photo ? (
-                        <span className="mt-1 inline-flex items-center gap-1 text-[0.6875rem] text-[var(--text-faint)]">
+                        <span className="mt-1 inline-flex items-center gap-1 text-[0.75rem] text-[var(--text-faint)]">
                           <Sparkles size={11} /> Colour read from the photo
                         </span>
                       ) : null}
@@ -490,6 +493,7 @@ export default function AddPage() {
             ) : null}
             <ItemForm
               draft={editingEntry.draft}
+              knownBrands={knownBrands}
               onChange={(next) =>
                 patch(editingEntry.key, { draft: { ...editingEntry.draft, ...next } })
               }

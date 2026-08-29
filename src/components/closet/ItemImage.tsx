@@ -38,7 +38,7 @@ export function ItemImage({
         style={{ background, color: readableTextOn(background) }}
       >
         {showLabel ? (
-          <span className="px-2 text-center text-[0.6875rem] font-semibold opacity-80">
+          <span className="px-2 text-center text-[0.75rem] font-semibold opacity-80">
             {categoryLabel(item.category)}
           </span>
         ) : null}
@@ -55,6 +55,12 @@ export function ItemImage({
       alt={item.name}
       loading="lazy"
       decoding="async"
+      /*
+       * An image is draggable by default, so a sideways drag across a garment
+       * starts a native image drag — which fires pointercancel and silently
+       * kills any swipe gesture built on top of it.
+       */
+      draggable={false}
       className={cn(
         fit === 'cover' ? 'object-cover' : 'object-contain',
         'size-full',

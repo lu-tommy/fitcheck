@@ -21,6 +21,7 @@ import {
   WASH_LABEL,
 } from '@/domain/care';
 import { hexForColorName, suggestPairings } from '@/domain/color';
+import { availableBrands } from '@/domain/filters';
 import {
   FORMALITY_LABEL,
   PATTERN_LABEL,
@@ -45,6 +46,8 @@ export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ItemDraft | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const knownBrands = useMemo(() => availableBrands(items), [items]);
 
   const pairings = useMemo(
     () => (item ? suggestPairings(item.primaryColorHex, item.primaryColor) : []),
@@ -380,7 +383,11 @@ export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
         }
       >
         {draft ? (
-          <ItemForm draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+          <ItemForm
+            draft={draft}
+            knownBrands={knownBrands}
+            onChange={(patch) => setDraft({ ...draft, ...patch })}
+          />
         ) : null}
       </Sheet>
 
