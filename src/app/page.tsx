@@ -49,6 +49,21 @@ export default function HomePage() {
   const preferences = usePreferences((state) => state.preferences);
   const weather = useWeather((state) => state.snapshot);
   const [loadingDemo, setLoadingDemo] = useState(false);
+  /*
+   * The greeting and the date are the only things on this screen that depend on
+   * WHEN it is rendered, and Next prerenders this route at build time
+   * (prerender-manifest: "/" is compute:"static"). That baked the build date
+   * into index.html — a container built on 29 Aug still greeted every visitor
+   * with "Saturday, August 29" three days later.
+   * suppressHydrationWarning was already on both nodes, which made it permanent
+   * rather than fixing it: it tells React not to patch the text, so the stale
+   * server string survives hydration instead of being corrected.
+   * So render them only once mounted. Server and first client render now agree
+   * (both empty), there is no mismatch to suppress, and the value is always the
+   * real one. The element keeps its height either way, so nothing shifts.
+   */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const today = todayKey();
   const planned = entryFor(today);
@@ -212,15 +227,10 @@ export default function HomePage() {
           React treating the difference as a bug, and without the flicker a
           mount-guard would cause.
         */}
-        <h1 className="text-display" suppressHydrationWarning>
-          {greeting()}
-        </h1>
-        <p
-          className="mt-1.5 text-[0.9375rem] text-[var(--text-muted)]"
-          suppressHydrationWarning
-        >
-          {longDate(today)}
-          {weather
+        <h1 className="text-display">{mounted ? greeting() : '\u00a0'}</h1>
+        <p className="mt-1.5 text-[0.9375rem] text-[var(--text-muted)]">
+          {mounted ? longDate(today) : '\u00a0'}
+          {mounted && weather
             ? ` · ${formatTemperature(weather.temperature, preferences.units)} ${describeSky(
                 weather.code,
               )}`

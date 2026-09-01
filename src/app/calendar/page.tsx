@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { OutfitThumb } from '@/components/outfit/OutfitStack';
 import { PageHeader } from '@/components/PageHeader';
@@ -37,6 +37,16 @@ export default function CalendarPage() {
   const items = useActiveItems();
   const weather = useWeather((state) => state.snapshot);
   const preferences = usePreferences((state) => state.preferences);
+  /*
+   * Every value on this screen is derived from "now" — the month grid, today's
+   * highlight, the next fourteen days. Next prerenders this route at build time,
+   * so all of it was computed against the BUILD date and then corrected on
+   * hydration: that mismatch is the React #418 this page logged on every visit.
+   * Hold the render until mounted so the server and the first client render
+   * agree, and the dates are the real ones rather than the build's.
+   */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [picking, setPicking] = useState<string | null>(null);
   const [planning, setPlanning] = useState(false);
@@ -59,6 +69,9 @@ export default function CalendarPage() {
         .filter((entry) => entry.outfit),
     [byDate],
   );
+
+  // hooks are all above this line, so the early return keeps their order stable
+  if (!mounted) return null;
 
   return (
     <div className="pb-4">
