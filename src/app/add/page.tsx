@@ -7,6 +7,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { EMPTY_DRAFT, ItemForm, draftLabel, type ItemDraft } from '@/components/closet/ItemForm';
 import { MultiCrop } from '@/components/closet/MultiCrop';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { Sheet } from '@/components/ui/Sheet';
 import { hexForColorName } from '@/domain/color';
 import { availableBrands } from '@/domain/filters';
@@ -462,23 +463,18 @@ export default function AddPage() {
                           {CATEGORIES.filter(
                             (meta) => meta.slot === slotOf(entry.draft.category),
                           ).map((meta) => (
-                            <button
+                            <Chip
                               key={meta.category}
-                              type="button"
+                              selected={meta.category === entry.draft.category}
+                              className="shrink-0 text-[0.75rem]"
                               onClick={() =>
                                 patch(entry.key, {
                                   draft: { ...entry.draft, category: meta.category },
                                 })
                               }
-                              className={cn(
-                                'pressable shrink-0 rounded-full px-2.5 py-1 text-[0.75rem]',
-                                meta.category === entry.draft.category
-                                  ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
-                                  : 'bg-[var(--surface-alt)] text-[var(--text-muted)]',
-                              )}
                             >
                               {meta.label}
-                            </button>
+                            </Chip>
                           ))}
                         </div>
                       ) : null}
