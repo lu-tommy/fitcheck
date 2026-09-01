@@ -4,7 +4,7 @@ import { ChevronDown } from 'lucide-react';
 
 import { careSummary, suggestedCare } from '@/domain/care';
 import { hexForColorName } from '@/domain/color';
-import {
+import { categoryMeta,
   CATEGORIES,
   FORMALITY_LABEL,
   FORMALITY_ORDER,
@@ -108,7 +108,18 @@ export function ItemForm({
       <Field label="Category">
         <Select
           value={draft.category}
-          onChange={(event) => onChange({ category: event.target.value as Category })}
+          onChange={(event) => {
+            /*
+             * Dressiness follows from what the thing IS. The draft used to keep
+             * a hardcoded 'casual' whatever was chosen, so a tank top was filed
+             * as casual rather than very-casual — and the outfit engine, which
+             * reads formality, then saw nothing wrong with putting it under a
+             * pair of dress trousers. Changing the category moves the formality
+             * with it; it stays editable underneath.
+             */
+            const category = event.target.value as Category;
+            onChange({ category, formality: categoryMeta(category).formality });
+          }}
         >
           {CATEGORIES.map((meta) => (
             <option key={meta.category} value={meta.category}>

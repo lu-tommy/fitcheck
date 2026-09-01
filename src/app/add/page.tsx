@@ -227,7 +227,16 @@ export default function AddPage() {
           discard(recropKey);
           setRecropKey(null);
         }
-        await ingest(crops, { autoCutout: true });
+        /*
+         * autoCutout stays FALSE here, and that is the whole point of cropping.
+         * A crop out of a worn photo has skin, a wall and a phone around the
+         * garment rather than a plain backdrop, so a flood fill seeded from its
+         * edges eats into the person: cropping a mirror selfie to a tank top and
+         * then cutting it out took half an arm with it. The crop IS the item.
+         * The cut-out is still one toggle away for the rare crop that happens to
+         * sit on a plain surface.
+         */
+        await ingest(crops, { autoCutout: false });
       } catch (error) {
         toast((error as Error).message || 'Could not cut that photo up', { tone: 'danger' });
       }

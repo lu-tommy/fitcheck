@@ -172,6 +172,46 @@ function harmonyBonus(candidate: ClothingItem, chosen: ClothingItem[]): number {
   return (report.score - 60) / 3;
 }
 
+/**
+ * How badly a candidate clashes with what is already on the body.
+ *
+ * scoreItem judges every piece on its own against the REQUEST, so nothing ever
+ * compared the chosen top to the chosen trousers: a very-casual tank and a pair
+ * of formal dress trousers are four steps apart on the same scale and the
+ * engine happily put them together, which is exactly what a person notices
+ * first and trusts least.
+ *
+ * Only the pieces that set the register are considered — a top, a bottom, or a
+ * one-piece. A smart-casual belt or watch with a casual outfit is normal
+ * dressing, not a mistake, so accessories and layers are left out of it.
+ *
+ * The scale is deliberately forgiving, because most real dressing is mixed: an
+ * Oxford shirt with jeans is two steps apart and is simply an outfit. Three
+ * steps is a stretch worth discouraging. Four — a very-casual tank with formal
+ * dress trousers — is the thing you would notice across a room, and it costs
+ * more than any other bonus in the scorer can win back.
+ */
+const REGISTER_SLOTS: Slot[] = ['top', 'bottom', 'fullbody'];
+const CLASH_COST = [0, 0, 0, 25, 70];
+
+export function formalityClashPenalty(
+  candidate: ClothingItem,
+  chosen: ClothingItem[],
+): number {
+  if (!REGISTER_SLOTS.includes(slotOf(candidate.category))) return 0;
+  const anchors = chosen.filter((item) => REGISTER_SLOTS.includes(slotOf(item.category)));
+  if (!anchors.length) return 0;
+  const here = formalityScore(candidate.formality);
+  const worst = Math.max(
+    ...anchors.map((item) => Math.abs(here - formalityScore(item.formality))),
+  );
+  const cost = CLASH_COST[Math.min(worst, CLASH_COST.length - 1)] ?? 0;
+  // Return a plain zero rather than -0: negative zero compares unequal to 0
+  // under Object.is, which is the sort of thing that survives into a test and
+  // then into a bug report.
+  return cost === 0 ? 0 : -cost;
+}
+
 function pickForSlot(
   slot: Slot,
   candidates: ScoredItem[],
@@ -180,7 +220,13 @@ function pickForSlot(
 ): ClothingItem | undefined {
   const options = candidates
     .filter((entry) => slotOf(entry.item.category) === slot && !used.has(entry.item.id))
-    .map((entry) => ({ ...entry, score: entry.score + harmonyBonus(entry.item, chosen) }))
+    .map((entry) => ({
+      ...entry,
+      score:
+        entry.score +
+        harmonyBonus(entry.item, chosen) +
+        formalityClashPenalty(entry.item, chosen),
+    }))
     .sort((a, b) => b.score - a.score);
   return options[0]?.item;
 }
