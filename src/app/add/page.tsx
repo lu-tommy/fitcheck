@@ -13,6 +13,8 @@ import { availableBrands } from '@/domain/filters';
 import { categoryLabel } from '@/domain/taxonomy';
 import { putPhoto } from '@/db';
 import { removeBackground } from '@/lib/backgroundRemoval';
+import { guessCategoryFromCutout } from '@/lib/silhouette';
+import { CONFIDENT, type CategoryGuess } from '@/domain/silhouette';
 import { cropToBlob, type CropBox } from '@/lib/crop';
 import { cn } from '@/lib/cn';
 import { createId } from '@/lib/id';
@@ -33,6 +35,8 @@ interface Pending {
   photo?: { blob: Blob; width: number; height: number };
   cutout?: { blob: Blob; width: number; height: number };
   useCutout: boolean;
+  /** What the outline suggested, so the form can show it and be disagreed with. */
+  guess?: CategoryGuess;
   draft: ItemDraft;
   taggedByAi: boolean;
 }
@@ -103,6 +107,24 @@ export default function AddPage() {
                 // removing, so the cut-out is offered rather than applied.
                 useCutout: options?.autoCutout ?? true,
               });
+
+              /*
+               * The cut-out is a garment-shaped mask, so the shape can say which
+               * SLOT this is — a top, trousers, a shoe — and that turns a
+               * 42-option picker into a handful. It does not claim to know a
+               * t-shirt from a polo, because an outline does not: it offers the
+               * most ordinary member of the slot as a starting point and says
+               * why, so disagreeing is one tap.
+               * Below CONFIDENT it says nothing and the picker is left alone; a
+               * wrong category costs more than an unset one.
+               */
+              const shapeGuess = await guessCategoryFromCutout(cutout.blob);
+              if (shapeGuess && shapeGuess.confidence >= CONFIDENT) {
+                patch(entry.key, {
+                  guess: shapeGuess,
+                  draft: { ...draft, category: shapeGuess.category },
+                });
+              }
             }
           }
 
@@ -396,6 +418,17 @@ export default function AddPage() {
                         {categoryLabel(entry.draft.category)} ·{' '}
                         {titleCase(entry.draft.primaryColor)}
                       </p>
+                      {/*
+                       * Say that the category was guessed and what from. An
+                       * unlabelled guess is worse than none: it reads as a fact,
+                       * so nobody checks it, and a wrong word ends up in the
+                       * closet. Named as a guess, correcting it is one tap.
+                       */}
+                      {entry.guess ? (
+                        <p className="truncate text-[0.75rem] text-[var(--text-muted)] opacity-80">
+                          Guessed from the photo — {entry.guess.because}. Tap to change.
+                        </p>
+                      ) : null}
                       {entry.photo ? (
                         <span className="mt-1 inline-flex items-center gap-1 text-[0.75rem] text-[var(--text-faint)]">
                           <Sparkles size={11} /> Colour read from the photo
