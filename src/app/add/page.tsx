@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { hexForColorName } from '@/domain/color';
 import { availableBrands } from '@/domain/filters';
-import { categoryLabel } from '@/domain/taxonomy';
+import { CATEGORIES, categoryLabel, slotOf } from '@/domain/taxonomy';
+import { countBySlot, progressLine } from '@/domain/wardrobeProgress';
 import { putPhoto } from '@/db';
 import { removeBackground } from '@/lib/backgroundRemoval';
 import { guessCategoryFromCutout } from '@/lib/silhouette';
@@ -256,6 +257,18 @@ export default function AddPage() {
   }
 
   const editingEntry = queue.find((entry) => entry.key === editing) ?? null;
+
+  /*
+   * Counted across the closet AND the queue, so the number moves as she works
+   * rather than only after saving — that is the whole point of showing it.
+   */
+  const progress = useMemo(() => {
+    const categories = [
+      ...closet.filter((item) => !item.archivedAt).map((item) => item.category),
+      ...queue.filter((entry) => entry.stage === 'ready').map((entry) => entry.draft.category),
+    ];
+    return progressLine(countBySlot(categories));
+  }, [closet, queue]);
   const readyCount = queue.filter((entry) => entry.stage === 'ready').length;
   const working = queue.some((entry) => entry.stage === 'processing');
 
@@ -435,6 +448,40 @@ export default function AddPage() {
                           Guessed from the photo — {entry.guess.because}. Tap to change.
                         </p>
                       ) : null}
+                      {/*
+                       * Correcting a guess used to mean: pencil, sheet, a
+                       * forty-two option select, close. Four moves and a scroll,
+                       * per wrong item, on a phone — which is exactly the tax
+                       * that makes cataloguing feel like a second job.
+                       * The shape already narrowed it to a slot, so the six
+                       * plausible answers fit on one row. One tap, no sheet.
+                       * The pencil is still there for everything else.
+                       */}
+                      {entry.stage === 'ready' ? (
+                        <div className="scroll-row -mx-1 mt-1.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+                          {CATEGORIES.filter(
+                            (meta) => meta.slot === slotOf(entry.draft.category),
+                          ).map((meta) => (
+                            <button
+                              key={meta.category}
+                              type="button"
+                              onClick={() =>
+                                patch(entry.key, {
+                                  draft: { ...entry.draft, category: meta.category },
+                                })
+                              }
+                              className={cn(
+                                'pressable shrink-0 rounded-full px-2.5 py-1 text-[0.75rem]',
+                                meta.category === entry.draft.category
+                                  ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
+                                  : 'bg-[var(--surface-alt)] text-[var(--text-muted)]',
+                              )}
+                            >
+                              {meta.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
                       {entry.photo ? (
                         <span className="mt-1 inline-flex items-center gap-1 text-[0.75rem] text-[var(--text-faint)]">
                           <Sparkles size={11} /> Colour read from the photo
@@ -486,6 +533,19 @@ export default function AddPage() {
         )}
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
+        {/*
+         * What the photographing is buying, in a number that is true.
+         * Cataloguing is the tedious half of any wardrobe app and the usual
+         * reason people stop; the antidote is not a badge but the fact that
+         * outfits multiply — the tenth piece really is worth more than the
+         * ninth. It counts COMBINATIONS and says so: whether a given pairing
+         * looks good is the outfit engine's job, and it is not flattered here.
+         * When nothing combines yet it names the one slot that would change
+         * that, which is a nudge that happens to be arithmetic.
+         */}
+        {progress ? (
+          <p className="mb-2 text-center text-[0.8125rem] text-[var(--text-muted)]">{progress}</p>
+        ) : null}
         <Button full size="lg" onClick={saveAll} disabled={!readyCount || saving || working}>
           {saving
             ? 'Saving…'
