@@ -3,6 +3,12 @@ services:
     build: .
     image: fitcheck:latest
     container_name: fitcheck
+    # This NAS has ~1.2GB spare and an earlyoom that has killed Jellyfin before,
+    # so nothing here is allowed to grow without a ceiling. Measured idle: 66MB;
+    # 256m leaves room for a photo-heavy sync without letting a leak take the box
+    # down. The cap lived only on the NAS's copy of this file, so a deploy from
+    # the repo silently removed it — it belongs in version control.
+    mem_limit: 256m
     restart: unless-stopped
     ports:
       # Nginx Proxy Manager runs in its own container, so it cannot reach
