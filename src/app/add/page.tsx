@@ -1,11 +1,10 @@
 'use client';
 
-import { Camera, ImagePlus, Loader2, PenLine, Scissors, Sparkles, Trash2, Wand2, X } from 'lucide-react';
+import { Camera, ImagePlus, Loader2, PenLine, Scissors, Sparkles, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { EMPTY_DRAFT, ItemForm, draftLabel, type ItemDraft } from '@/components/closet/ItemForm';
-import { GarmentRefine } from '@/components/closet/GarmentRefine';
 import { MultiCrop } from '@/components/closet/MultiCrop';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
@@ -16,7 +15,6 @@ import { CATEGORIES, categoryLabel, slotOf } from '@/domain/taxonomy';
 import { countBySlot, progressLine } from '@/domain/wardrobeProgress';
 import { putPhoto } from '@/db';
 import { removeBackground } from '@/lib/backgroundRemoval';
-import { analyseGarment, renderGarment } from '@/lib/segment';
 import { guessCategoryFromCutout } from '@/lib/silhouette';
 import { trimToGarment } from '@/lib/trim';
 import { CONFIDENT, type CategoryGuess } from '@/domain/silhouette';
@@ -90,7 +88,6 @@ export default function AddPage() {
    * back out.
    */
   const [recropKey, setRecropKey] = useState<string | null>(null);
-  const [refineKey, setRefineKey] = useState<string | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const outfitInput = useRef<HTMLInputElement>(null);
@@ -106,11 +103,6 @@ export default function AddPage() {
       accepted: Blob[],
       options?: {
         autoCutout?: boolean;
-        /**
-         * The blobs are already garment-shaped, so nothing should try to find
-         * a background in them — there isn't one left.
-         */
-        alreadyCutOut?: boolean;
         /** Aligned with `accepted`: where each one came from. */
         origins?: (CropOrigin | undefined)[];
       },
@@ -147,38 +139,7 @@ export default function AddPage() {
             photo: { blob: processed.blob, width: processed.width, height: processed.height },
             draft,
           });
-
-          /*
-           * A blob that arrived already cut out skips background removal
-           * entirely. Running a flood fill over it would seed on its own
-           * transparent border and eat the garment — the failure that took half
-           * an arm off a mirror selfie.
-           */
-          if (options?.alreadyCutOut) {
-            patch(entry.key, {
-              cutoutUrl: URL.createObjectURL(processed.blob),
-              cutout: {
-                blob: processed.blob,
-                width: processed.width,
-                height: processed.height,
-              },
-              useCutout: true,
-            });
-            /*
-             * The shape can still say which slot this is. It has been trimmed
-             * to the garment, so the one rule that reads coverage of the whole
-             * frame — "tiny in a big picture, so jewellery" — can no longer
-             * fire. That costs a shortcut, not accuracy: it stays quiet rather
-             * than guessing wrong, and every other rule reads the outline.
-             */
-            const shapeGuess = await guessCategoryFromCutout(processed.blob);
-            if (shapeGuess && shapeGuess.confidence >= CONFIDENT) {
-              patch(entry.key, {
-                guess: shapeGuess,
-                draft: { ...draft, category: shapeGuess.category },
-              });
-            }
-          } else if (backgroundRemoval !== 'off') {
+          if (backgroundRemoval !== 'off') {
             const cutout = await removeBackground(processed.blob, backgroundRemoval);
 
             /*
@@ -275,19 +236,8 @@ export default function AddPage() {
       try {
         const bitmap = await createImageBitmap(source, { imageOrientation: 'from-image' });
         const crops: Blob[] = [];
-        const cutOut: boolean[] = [];
         for (const box of boxes) {
-          /*
-           * Now that the box exists, the hard question has an answer. A flood
-           * fill from the frame edge has to ask "what colour is the backdrop?"
-           * and a bathroom has no answer; this asks "what is like the middle of
-           * this box, and unlike everything around it?", which tile and a blue
-           * tank answer cleanly.
-           */
-          const analysis = await analyseGarment(bitmap, box);
-          const garment = analysis?.confident ? await renderGarment(bitmap, analysis) : null;
-          crops.push(garment ?? (await cropToBlob(bitmap, box)));
-          cutOut.push(Boolean(garment));
+          crops.push(await cropToBlob(bitmap, box));
         }
         bitmap.close();
         // A crop taken FROM a queued row replaces it; the boxes are the piece now.
@@ -305,32 +255,15 @@ export default function AddPage() {
          * sit on a plain surface.
          */
         /*
-         * Every box carries its photo forward so the cut-out can be corrected
-         * by pointing at it, rather than only accepted or thrown away.
+         * autoCutout stays FALSE, and that is the whole point of cropping.
+         * A crop out of a worn photo has skin, a wall and a phone around the
+         * garment rather than a plain backdrop, so nothing seeded from its
+         * edges can find the difference: it eats into the person instead.
+         * Separating the garment from the room is not this screen's job. The
+         * crop IS the item, and the only thing that matters is that the box was
+         * easy to place exactly where she meant it.
          */
-        const origins = boxes.map((box) => ({ source, box }));
-
-        /*
-         * Where the split worked the blob IS the garment; where it did not, it
-         * is the plain rectangle and autoCutout stays FALSE, because a crop out
-         * of a worn photo has skin, a wall and a phone around the garment
-         * rather than a plain backdrop. Both go in together, so a photo that
-         * yields one clean piece and one awkward one still queues both.
-         */
-        const separated = crops.filter((_, index) => cutOut[index]);
-        const rectangles = crops.filter((_, index) => !cutOut[index]);
-        if (separated.length) {
-          await ingest(separated, {
-            alreadyCutOut: true,
-            origins: origins.filter((_, index) => cutOut[index]),
-          });
-        }
-        if (rectangles.length) {
-          await ingest(rectangles, {
-            autoCutout: false,
-            origins: origins.filter((_, index) => !cutOut[index]),
-          });
-        }
+        await ingest(crops, { autoCutout: false, origins: boxes.map((box) => ({ source, box })) });
       } catch (error) {
         toast((error as Error).message || 'Could not cut that photo up', { tone: 'danger' });
       }
@@ -423,65 +356,7 @@ export default function AddPage() {
   }
 
   const editingEntry = queue.find((entry) => entry.key === editing) ?? null;
-  const refineEntry = queue.find((entry) => entry.key === refineKey) ?? null;
 
-  /** Swap in a cut-out the person corrected by hand. */
-  async function applyRefined(key: string, blob: Blob) {
-    setRefineKey(null);
-    try {
-      const processed = await processPhoto(blob);
-      setQueue((current) =>
-        current.map((entry) => {
-          if (entry.key !== key) return entry;
-          if (entry.cutoutUrl?.startsWith('blob:')) URL.revokeObjectURL(entry.cutoutUrl);
-          const photo = {
-            blob: processed.blob,
-            width: processed.width,
-            height: processed.height,
-          };
-          return {
-            ...entry,
-            photo,
-            cutout: photo,
-            cutoutUrl: URL.createObjectURL(processed.blob),
-            useCutout: true,
-            busyBackground: false,
-          };
-        }),
-      );
-    } catch (error) {
-      toast((error as Error).message || 'Could not save that cut-out', { tone: 'danger' });
-    }
-  }
-
-  /** Give up on separating it and keep the rectangle that was drawn. */
-  async function applyRectangle(key: string, origin: CropOrigin) {
-    setRefineKey(null);
-    try {
-      const bitmap = await createImageBitmap(origin.source, { imageOrientation: 'from-image' });
-      const processed = await processPhoto(await cropToBlob(bitmap, origin.box));
-      bitmap.close();
-      setQueue((current) =>
-        current.map((entry) => {
-          if (entry.key !== key) return entry;
-          if (entry.cutoutUrl?.startsWith('blob:')) URL.revokeObjectURL(entry.cutoutUrl);
-          return {
-            ...entry,
-            photo: {
-              blob: processed.blob,
-              width: processed.width,
-              height: processed.height,
-            },
-            cutout: undefined,
-            cutoutUrl: undefined,
-            useCutout: false,
-          };
-        }),
-      );
-    } catch (error) {
-      toast((error as Error).message || 'Could not crop that photo', { tone: 'danger' });
-    }
-  }
 
   /*
    * Counted across the closet AND the queue, so the number moves as she works
@@ -728,16 +603,6 @@ export default function AddPage() {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">
-                  {entry.stage === 'ready' && entry.origin ? (
-                    <button
-                      type="button"
-                      onClick={() => setRefineKey(entry.key)}
-                      aria-label="Tidy the edges of this cut-out"
-                      className="pressable grid size-9 place-items-center rounded-full bg-[var(--surface-alt)]"
-                    >
-                      <Wand2 size={16} />
-                    </button>
-                  ) : null}
                   {entry.stage === 'ready' && (entry.source || entry.photo) ? (
                     <button
                       type="button"
@@ -820,17 +685,6 @@ export default function AddPage() {
                 : 'Add to closet'}
         </Button>
       </div>
-
-      {refineEntry?.origin ? (
-        <GarmentRefine
-          file={refineEntry.origin.source}
-          box={refineEntry.origin.box}
-          onCancel={() => setRefineKey(null)}
-          onConfirm={(blob) => void applyRefined(refineEntry.key, blob)}
-          onFallback={() => void applyRectangle(refineEntry.key, refineEntry.origin!)}
-        />
-      ) : null}
-
       {cropSource ? (
         <MultiCrop
           file={cropSource}

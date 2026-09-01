@@ -25,10 +25,14 @@ export interface CropBox {
 /** Portrait, matching the closet grid's tiles. */
 export const CROP_ASPECT = 4 / 5;
 
-/** A little air around the box, so nothing is cut flush to the fabric. */
-const PADDING = 0.06;
-
-export const MIN_BOX = 0.06;
+/**
+ * The smallest box worth keeping, as a fraction of the photo.
+ *
+ * It doubles as the test for "was that a drag or a tap?", so it cannot go much
+ * lower without stray taps leaving specks behind. With pinch-zoom, a small
+ * piece is framed by zooming in rather than by drawing a tiny box.
+ */
+export const MIN_BOX = 0.03;
 
 export function normaliseBox(box: CropBox): CropBox {
   const x = Math.min(box.x, box.x + box.width);
@@ -49,42 +53,82 @@ function clamp(value: number, min = 0, max = 1): number {
 }
 
 /**
- * Cut one box out of the source.
+ * Cut one box out of the source. Exactly the box, and nothing else.
  *
- * The box is padded, then grown to the target aspect ratio. Where the image
- * runs out before the frame is filled — a garment at the very edge of the shot
- * — the remainder is filled with the crop's own border colour rather than
- * black bars, so the result still reads as a photographed object.
+ * This used to pad the box by 6% and then GROW it until it matched the tile's
+ * shape, taking whatever the photo happened to have there. On a mirror selfie
+ * that is more wall, more arm and more of the shorts — so a box placed
+ * carefully around a tank top still produced a tile with a bathroom in it. No
+ * amount of care with the box could beat the crop widening afterwards.
+ *
+ * The region is now honoured to the pixel. It is centred in a tile-shaped frame
+ * and whatever the frame does not cover is filled with the crop's own border
+ * colour, so a grid of pieces still lines up without a single pixel being added
+ * from outside what was framed. Draw the box at 4:5 and there is nothing to
+ * fill at all.
  */
+export interface CropPlan {
+  /** The region to read, in source pixels. Exactly the drawn box. */
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+  /** The tile the region is centred in. */
+  outWidth: number;
+  outHeight: number;
+  left: number;
+  top: number;
+  scale: number;
+}
+
+/**
+ * Where the drawn box lands in the finished tile.
+ *
+ * Separated from the canvas work so the promise this screen makes — the crop is
+ * the box, to the pixel — is something a test can hold it to.
+ */
+export function cropFrame(
+  box: CropBox,
+  sourceWidth: number,
+  sourceHeight: number,
+  maxDimension = 1200,
+): CropPlan {
+  const safe = normaliseBox(box);
+  const sx = safe.x * sourceWidth;
+  const sy = safe.y * sourceHeight;
+  const sw = Math.max(1, safe.width * sourceWidth);
+  const sh = Math.max(1, safe.height * sourceHeight);
+
+  // The frame is never smaller than the region, so nothing drawn is cut back
+  // off; a box already at the tile's shape needs no frame at all.
+  const frameWidth = Math.max(sw, sh * CROP_ASPECT);
+  const frameHeight = Math.max(sh, sw / CROP_ASPECT);
+
+  const scale = Math.min(1, maxDimension / Math.max(frameWidth, frameHeight));
+  const outWidth = Math.max(1, Math.round(frameWidth * scale));
+  const outHeight = Math.max(1, Math.round(frameHeight * scale));
+
+  return {
+    sx,
+    sy,
+    sw,
+    sh,
+    outWidth,
+    outHeight,
+    left: (outWidth - sw * scale) / 2,
+    top: (outHeight - sh * scale) / 2,
+    scale,
+  };
+}
+
 export async function cropToBlob(
   source: ImageBitmap,
   box: CropBox,
   maxDimension = 1200,
 ): Promise<Blob> {
   const safe = normaliseBox(box);
-
-  const padX = safe.width * PADDING;
-  const padY = safe.height * PADDING;
-  let sx = (safe.x - padX) * source.width;
-  let sy = (safe.y - padY) * source.height;
-  let sw = (safe.width + padX * 2) * source.width;
-  let sh = (safe.height + padY * 2) * source.height;
-
-  // Grow the short side until the region matches the output aspect.
-  const currentAspect = sw / sh;
-  if (currentAspect > CROP_ASPECT) {
-    const wanted = sw / CROP_ASPECT;
-    sy -= (wanted - sh) / 2;
-    sh = wanted;
-  } else {
-    const wanted = sh * CROP_ASPECT;
-    sx -= (wanted - sw) / 2;
-    sw = wanted;
-  }
-
-  const scale = Math.min(1, maxDimension / Math.max(sw, sh));
-  const outWidth = Math.max(1, Math.round(sw * scale));
-  const outHeight = Math.max(1, Math.round(sh * scale));
+  const plan = cropFrame(safe, source.width, source.height, maxDimension);
+  const { sx, sy, sw, sh, outWidth, outHeight, scale } = plan;
 
   const canvas = document.createElement('canvas');
   canvas.width = outWidth;
@@ -97,24 +141,7 @@ export async function cropToBlob(
   context.fillStyle = await borderColor(source, safe);
   context.fillRect(0, 0, outWidth, outHeight);
 
-  // Intersect the wanted region with the image, and draw it where it belongs.
-  const ix = Math.max(0, sx);
-  const iy = Math.max(0, sy);
-  const iw = Math.min(source.width, sx + sw) - ix;
-  const ih = Math.min(source.height, sy + sh) - iy;
-  if (iw > 0 && ih > 0) {
-    context.drawImage(
-      source,
-      ix,
-      iy,
-      iw,
-      ih,
-      (ix - sx) * scale,
-      (iy - sy) * scale,
-      iw * scale,
-      ih * scale,
-    );
-  }
+  context.drawImage(source, sx, sy, sw, sh, plan.left, plan.top, sw * scale, sh * scale);
 
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, 'image/jpeg', 0.86),

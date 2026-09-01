@@ -1,7 +1,7 @@
 'use client';
 
-import { Trash2, Undo2 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Maximize2, Minus, Plus, Trash2, Undo2 } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { MIN_BOX, normaliseBox, type CropBox } from '@/lib/crop';
@@ -10,40 +10,67 @@ import { cn } from '@/lib/cn';
 import { pluralize } from '@/lib/format';
 
 /** Which edges a handle moves. Corners move two. */
-type Edge = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+export type Edge = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
 type Drag =
   | { mode: 'draw'; id: string; originX: number; originY: number }
   | { mode: 'move'; id: string; grabX: number; grabY: number }
   | { mode: 'resize'; id: string; edge: Edge };
 
-const HANDLES: { edge: Edge; style: React.CSSProperties; cursor: string }[] = [
-  { edge: 'nw', style: { left: 0, top: 0 }, cursor: 'nwse-resize' },
-  { edge: 'n', style: { left: '50%', top: 0 }, cursor: 'ns-resize' },
-  { edge: 'ne', style: { left: '100%', top: 0 }, cursor: 'nesw-resize' },
-  { edge: 'e', style: { left: '100%', top: '50%' }, cursor: 'ew-resize' },
-  { edge: 'se', style: { left: '100%', top: '100%' }, cursor: 'nwse-resize' },
-  { edge: 's', style: { left: '50%', top: '100%' }, cursor: 'ns-resize' },
-  { edge: 'sw', style: { left: 0, top: '100%' }, cursor: 'nesw-resize' },
-  { edge: 'w', style: { left: 0, top: '50%' }, cursor: 'ew-resize' },
+interface Pinch {
+  distance: number;
+  /** The image point under the pinch's midpoint, which must not move. */
+  fx: number;
+  fy: number;
+  zoom: number;
+}
+
+const HANDLES: { edge: Edge; left: string; top: string; cursor: string }[] = [
+  { edge: 'nw', left: '0%', top: '0%', cursor: 'nwse-resize' },
+  { edge: 'n', left: '50%', top: '0%', cursor: 'ns-resize' },
+  { edge: 'ne', left: '100%', top: '0%', cursor: 'nesw-resize' },
+  { edge: 'e', left: '100%', top: '50%', cursor: 'ew-resize' },
+  { edge: 'se', left: '100%', top: '100%', cursor: 'nwse-resize' },
+  { edge: 's', left: '50%', top: '100%', cursor: 'ns-resize' },
+  { edge: 'sw', left: '0%', top: '100%', cursor: 'nesw-resize' },
+  { edge: 'w', left: '0%', top: '50%', cursor: 'ew-resize' },
 ];
 
-const LOUPE = 112;
-const LOUPE_ZOOM = 2.6;
+/** Visual aspect ratios, as width ÷ height. `null` is free-form. */
+const SHAPES: { label: string; aspect: number | null }[] = [
+  { label: 'Free', aspect: null },
+  { label: 'Tile', aspect: 4 / 5 },
+  { label: 'Square', aspect: 1 },
+];
+
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 10;
+const LOUPE = 108;
+const LOUPE_ZOOM = 2.4;
 
 /**
- * Draw a box around each garment in a photo.
+ * Box each garment in a photo, precisely.
  *
- * Deliberately manual. The person holding the phone already knows which shape
- * is the jacket, and asking them to drag four boxes is faster — and far more
- * reliable — than asking a model to guess and then correcting it.
+ * The precision comes from zoom, not from a steadier hand. Fitted to a phone
+ * screen a 960-pixel-wide photo shows at about a third of its size, so one
+ * screen pixel is three source pixels and a fingertip covers a hundred of
+ * them — at that scale nobody can place an edge on a hem, and no amount of
+ * handle polish changes the arithmetic. Pinching to 6× makes the same gesture
+ * six times finer, which is why every serious cropper is built around it.
  *
- * Two things make that box land where they meant it to. Every edge and corner
- * can be dragged, so a box that came out slightly wrong is nudged rather than
- * deleted and redrawn — it previously had a single bottom-right handle, which
- * meant the top edge could not be corrected at all. And a loupe follows the
- * drag, because on a phone the fingertip covers roughly a hundred pixels of the
- * source image: you were aiming at an edge you could not see.
+ * The rest is what stops a careful box from being undone afterwards:
+ *
+ * - Every edge and corner drags. There used to be one handle, bottom-right,
+ *   resizing with the top-left pinned, so a box whose top edge came out wrong
+ *   could only be deleted and drawn again.
+ * - An edge handle moves ONLY that edge. This is the long-standing complaint
+ *   about the iOS cropper, where dragging a corner shifts the other handles
+ *   and the workaround is to use the middle of an edge instead.
+ * - A loupe follows the drag, because the finger is on top of the very edge
+ *   being aligned.
+ * - The crop that comes out is the box that was drawn, to the pixel. It used
+ *   to be padded by 6% and then grown to the tile's shape, which quietly put
+ *   the bathroom back into a carefully framed tank top.
  */
 export function MultiCrop({
   file,
@@ -55,19 +82,28 @@ export function MultiCrop({
   onConfirm: (boxes: CropBox[]) => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
-  const [aspect, setAspect] = useState(3 / 4);
+  const [image, setImage] = useState({ width: 0, height: 0 });
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [boxes, setBoxes] = useState<CropBox[]>([]);
   const [active, setActive] = useState<string | null>(null);
+  const [shape, setShape] = useState<number | null>(null);
   const [loupe, setLoupe] = useState<{ x: number; y: number } | null>(null);
+
   const drag = useRef<Drag | null>(null);
-  const surface = useRef<HTMLDivElement>(null);
+  const pinch = useRef<Pinch | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const lastTap = useRef(0);
+  const grew = useRef(false);
+  const frame = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const objectUrl = URL.createObjectURL(file);
     setUrl(objectUrl);
     let cancelled = false;
     void createImageBitmap(file, { imageOrientation: 'from-image' }).then((bitmap) => {
-      if (!cancelled) setAspect(bitmap.width / bitmap.height);
+      if (!cancelled) setImage({ width: bitmap.width, height: bitmap.height });
       bitmap.close();
     });
     return () => {
@@ -76,74 +112,205 @@ export function MultiCrop({
     };
   }, [file]);
 
-  /** Pointer position as a fraction of the image, which is what boxes store. */
-  const pointToFraction = useCallback((event: React.PointerEvent) => {
-    const rect = surface.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return {
-      x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
-      y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
-    };
+  useLayoutEffect(() => {
+    const node = frame.current;
+    if (!node) return;
+    const measure = () =>
+      setViewport({ width: node.clientWidth, height: node.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
   }, []);
+
+  /* ---------------------------------------------------------------- geometry */
+
+  const fit =
+    image.width && viewport.width
+      ? Math.min(viewport.width / image.width, viewport.height / image.height)
+      : 0;
+  const displayWidth = image.width * fit * zoom;
+  const displayHeight = image.height * fit * zoom;
+  const originX = place(viewport.width, displayWidth, pan.x);
+  const originY = place(viewport.height, displayHeight, pan.y);
+
+  /** Screen point → fraction of the photo, which is what boxes store. */
+  const toFraction = useCallback(
+    (clientX: number, clientY: number) => {
+      const rect = frame.current?.getBoundingClientRect();
+      if (!rect || !displayWidth) return { x: 0, y: 0 };
+      return {
+        x: clamp01((clientX - rect.left - originX) / displayWidth),
+        y: clamp01((clientY - rect.top - originY) / displayHeight),
+      };
+    },
+    [displayWidth, displayHeight, originX, originY],
+  );
+
+  const local = useCallback((clientX: number, clientY: number) => {
+    const rect = frame.current?.getBoundingClientRect();
+    return { x: clientX - (rect?.left ?? 0), y: clientY - (rect?.top ?? 0) };
+  }, []);
+
+  /** Zoom about a point on screen, keeping whatever is under it still. */
+  const zoomAbout = useCallback(
+    (next: number, screenX: number, screenY: number) => {
+      const wanted = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
+      const fx = (screenX - originX) / displayWidth;
+      const fy = (screenY - originY) / displayHeight;
+      const width = image.width * fit * wanted;
+      const height = image.height * fit * wanted;
+      setZoom(wanted);
+      setPan({
+        x: screenX - fx * width - (viewport.width - width) / 2,
+        y: screenY - fy * height - (viewport.height - height) / 2,
+      });
+    },
+    [displayWidth, displayHeight, originX, originY, image, fit, viewport],
+  );
+
+  /* ---------------------------------------------------------------- gestures */
 
   function begin(event: React.PointerEvent, state: Drag) {
     drag.current = state;
     setActive(state.id);
-    setLoupe(pointToFraction(event));
+    setLoupe(state.mode === 'move' ? null : toFraction(event.clientX, event.clientY));
     (event.target as Element).setPointerCapture?.(event.pointerId);
   }
 
+  function track(event: React.PointerEvent) {
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  }
+
   function onPointerDown(event: React.PointerEvent) {
-    if (event.button !== 0 && event.pointerType === 'mouse') return;
-    const { x, y } = pointToFraction(event);
+    track(event);
+    if (pointers.current.size === 2) {
+      // Two fingers is always the photo, never a box: dropping the half-drawn
+      // one avoids leaving a stray speck behind every pinch.
+      const half = drag.current;
+      if (half?.mode === 'draw') setBoxes((current) => current.filter((box) => box.id !== half.id));
+      drag.current = null;
+      setLoupe(null);
+      startPinch();
+      return;
+    }
+    if (pointers.current.size > 1 || event.button !== 0) return;
+    const { x, y } = toFraction(event.clientX, event.clientY);
     const id = createId('box');
+    grew.current = false;
     setBoxes((current) => [...current, { id, x, y, width: 0, height: 0 }]);
     begin(event, { mode: 'draw', id, originX: x, originY: y });
   }
 
+  function startPinch() {
+    const [a, b] = [...pointers.current.values()];
+    if (!a || !b) return;
+    const midX = (a.x + b.x) / 2;
+    const midY = (a.y + b.y) / 2;
+    const point = local(midX, midY);
+    pinch.current = {
+      distance: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+      fx: (point.x - originX) / displayWidth,
+      fy: (point.y - originY) / displayHeight,
+      zoom,
+    };
+  }
+
   function onPointerMove(event: React.PointerEvent) {
+    if (!pointers.current.has(event.pointerId)) return;
+    track(event);
+
+    const gesture = pinch.current;
+    if (gesture && pointers.current.size >= 2) {
+      event.preventDefault();
+      const [a, b] = [...pointers.current.values()];
+      const distance = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, (gesture.zoom * distance) / gesture.distance));
+      const mid = local((a.x + b.x) / 2, (a.y + b.y) / 2);
+      const width = image.width * fit * next;
+      const height = image.height * fit * next;
+      setZoom(next);
+      // Pan comes free: the midpoint moving IS the drag.
+      setPan({
+        x: mid.x - gesture.fx * width - (viewport.width - width) / 2,
+        y: mid.y - gesture.fy * height - (viewport.height - height) / 2,
+      });
+      return;
+    }
+
     const state = drag.current;
     if (!state) return;
     event.preventDefault();
-    const { x, y } = pointToFraction(event);
-    setLoupe({ x, y });
+    const { x, y } = toFraction(event.clientX, event.clientY);
+    if (state.mode !== 'move') setLoupe({ x, y });
 
     setBoxes((current) =>
       current.map((box) => {
         if (box.id !== state.id) return box;
         if (state.mode === 'draw') {
-          return {
-            ...box,
-            x: state.originX,
-            y: state.originY,
-            width: x - state.originX,
-            height: y - state.originY,
-          };
+          const drawn = draw(box, state.originX, state.originY, x, y, ratio);
+          if (Math.abs(drawn.width) >= MIN_BOX && Math.abs(drawn.height) >= MIN_BOX) {
+            grew.current = true;
+          }
+          return drawn;
         }
-        if (state.mode === 'resize') return resize(box, state.edge, x, y);
+        if (state.mode === 'resize') return resize(box, state.edge, x, y, ratio);
         return {
           ...box,
-          x: Math.max(0, Math.min(1 - box.width, x - state.grabX)),
-          y: Math.max(0, Math.min(1 - box.height, y - state.grabY)),
+          x: clamp01(Math.min(1 - box.width, x - state.grabX)),
+          y: clamp01(Math.min(1 - box.height, y - state.grabY)),
         };
       }),
     );
   }
 
-  function onPointerUp() {
+  function onPointerUp(event: React.PointerEvent) {
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    if (pointers.current.size === 1) startPinch();
+
     const state = drag.current;
-    drag.current = null;
+    if (pointers.current.size === 0) drag.current = null;
     setLoupe(null);
     if (!state) return;
-    // A tap that never became a box is a tap, not an empty selection.
+
+    // A drag that never grew is a tap, and two taps in a row are a zoom.
     setBoxes((current) =>
-      current
-        .map(normaliseBox)
-        .filter((box) => box.width >= MIN_BOX && box.height >= MIN_BOX),
+      current.map(normaliseBox).filter((box) => box.width >= MIN_BOX && box.height >= MIN_BOX),
     );
+
+    if (state.mode !== 'draw' || grew.current) return;
+    const now = Date.now();
+    if (now - lastTap.current < 320) {
+      const point = local(event.clientX, event.clientY);
+      zoomAbout(zoom > 1.6 ? 1 : 3, point.x, point.y);
+      lastTap.current = 0;
+    } else {
+      lastTap.current = now;
+    }
   }
 
+  function onWheel(event: React.WheelEvent) {
+    if (!displayWidth) return;
+    const point = local(event.clientX, event.clientY);
+    zoomAbout(zoom * (event.deltaY < 0 ? 1.12 : 1 / 1.12), point.x, point.y);
+  }
+
+  /* ------------------------------------------------------------------ render */
+
+  // Boxes are fractions of the photo, so a visually square box is only square
+  // in fractions when the photo is. Every ratio has to go through the image.
+  const imageAspect = image.width && image.height ? image.width / image.height : 1;
+  const ratio = shape === null ? null : shape / imageAspect;
+
   const ready = boxes.filter((box) => box.width >= MIN_BOX && box.height >= MIN_BOX);
+  const selected = ready.find((box) => box.id === active) ?? null;
+  const toScreen = (box: CropBox) => ({
+    left: originX + box.x * displayWidth,
+    top: originY + box.y * displayHeight,
+    width: box.width * displayWidth,
+    height: box.height * displayHeight,
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[var(--surface-sunken)]">
@@ -156,7 +323,7 @@ export function MultiCrop({
           <p className="text-[0.8125rem] text-[var(--text-muted)]">
             {ready.length
               ? `${pluralize(ready.length, 'piece')} marked`
-              : 'Drag a rectangle around one garment'}
+              : 'Pinch to zoom in, then drag a box'}
           </p>
         </div>
         <div className="flex shrink-0 gap-1">
@@ -180,15 +347,15 @@ export function MultiCrop({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 items-center justify-center px-4">
+      <div className="relative min-h-0 flex-1">
         <div
-          ref={surface}
+          ref={frame}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          className="relative max-h-full w-full touch-none overflow-hidden rounded-2xl bg-black/20 select-none"
-          style={{ aspectRatio: String(aspect) }}
+          onWheel={onWheel}
+          className="absolute inset-0 touch-none overflow-hidden select-none"
         >
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element -- blob: URL
@@ -196,35 +363,75 @@ export function MultiCrop({
               src={url}
               alt="Photo being divided into pieces"
               draggable={false}
-              className="pointer-events-none size-full object-contain"
+              className="pointer-events-none absolute max-w-none"
+              style={{
+                left: originX,
+                top: originY,
+                width: displayWidth || undefined,
+                height: displayHeight || undefined,
+              }}
             />
           ) : null}
 
+          {/* Everything outside the boxes, dimmed, so the crops read as the subject. */}
+          {ready.length ? (
+            <svg
+              aria-hidden
+              className="pointer-events-none absolute top-0 left-0"
+              width={viewport.width}
+              height={viewport.height}
+            >
+              <defs>
+                <mask id="fitcheck-crop-mask">
+                  <rect width={viewport.width} height={viewport.height} fill="white" />
+                  {ready.map((box) => {
+                    const r = toScreen(normaliseBox(box));
+                    return (
+                      <rect
+                        key={box.id}
+                        x={r.left}
+                        y={r.top}
+                        width={r.width}
+                        height={r.height}
+                        fill="black"
+                      />
+                    );
+                  })}
+                </mask>
+              </defs>
+              <rect
+                width={viewport.width}
+                height={viewport.height}
+                fill="rgba(0,0,0,0.45)"
+                mask="url(#fitcheck-crop-mask)"
+              />
+            </svg>
+          ) : null}
+
           {boxes.map((box, index) => {
-            const shape = normaliseBox(box);
-            const selected = active === box.id;
+            const shapeBox = normaliseBox(box);
+            const rect = toScreen(shapeBox);
+            const isActive = active === box.id;
+            const dragging = isActive && Boolean(loupe);
             return (
               <div
                 key={box.id}
+                data-piece={index + 1}
                 className={cn(
                   'absolute border-2',
                   selected ? 'border-[var(--brand)]' : 'border-white/90',
                 )}
-                style={{
-                  left: `${shape.x * 100}%`,
-                  top: `${shape.y * 100}%`,
-                  width: `${shape.width * 100}%`,
-                  height: `${shape.height * 100}%`,
-                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.02)',
-                }}
+                style={rect}
                 onPointerDown={(event) => {
+                  if (pointers.current.size >= 1) return;
                   event.stopPropagation();
-                  const { x, y } = pointToFraction(event);
+                  track(event);
+                  const { x, y } = toFraction(event.clientX, event.clientY);
                   begin(event, {
                     mode: 'move',
                     id: box.id,
-                    grabX: x - shape.x,
-                    grabY: y - shape.y,
+                    grabX: x - shapeBox.x,
+                    grabY: y - shapeBox.y,
                   });
                 }}
               >
@@ -232,36 +439,41 @@ export function MultiCrop({
                   {index + 1}
                 </span>
 
-                <button
-                  type="button"
-                  aria-label={`Remove box ${index + 1}`}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setBoxes((current) => current.filter((entry) => entry.id !== box.id));
-                  }}
-                  className="absolute -top-3 -right-3 grid size-7 place-items-center rounded-full bg-[var(--danger)] text-white shadow"
-                >
-                  <Trash2 size={13} />
-                </button>
+                {/* Thirds, only while it is being placed — a permanent grid is noise. */}
+                {dragging ? (
+                  <>
+                    <span className="absolute top-1/3 left-0 h-px w-full bg-white/35" />
+                    <span className="absolute top-2/3 left-0 h-px w-full bg-white/35" />
+                    <span className="absolute top-0 left-1/3 h-full w-px bg-white/35" />
+                    <span className="absolute top-0 left-2/3 h-full w-px bg-white/35" />
+                  </>
+                ) : null}
 
                 {HANDLES.map((handle) => (
                   <span
                     key={handle.edge}
                     role="presentation"
-                    aria-label={`Drag the ${handle.edge} edge`}
                     onPointerDown={(event) => {
+                      if (pointers.current.size >= 1) return;
                       event.stopPropagation();
+                      track(event);
                       begin(event, { mode: 'resize', id: box.id, edge: handle.edge });
                     }}
-                    style={{ ...handle.style, cursor: handle.cursor }}
+                    style={{ left: handle.left, top: handle.top, cursor: handle.cursor }}
                     /*
-                     * The touch target is 28px but the dot is 12px: on a phone a
-                     * handle you can see is not a handle you can hit.
+                     * An 11px dot inside a 44px target. Apple's minimum exists
+                     * because a finger is not a cursor, and a handle you can see
+                     * but cannot hit is worse than no handle.
                      */
-                    className="absolute grid size-7 -translate-x-1/2 -translate-y-1/2 place-items-center"
+                    className="absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center"
                   >
-                    <span className="size-3 rounded-full border-2 border-white bg-[var(--brand)] shadow" />
+                    <span
+                      className={cn(
+                        'rounded-full border-2 border-white shadow',
+                        handle.edge.length === 2 ? 'size-3' : 'size-2.5',
+                        isActive ? 'bg-[var(--brand)]' : 'bg-white/70',
+                      )}
+                    />
                   </span>
                 ))}
               </div>
@@ -275,12 +487,15 @@ export function MultiCrop({
               style={{
                 width: LOUPE,
                 height: LOUPE,
-                left: `calc(${loupe.x * 100}% - ${LOUPE / 2}px)`,
-                // Sit above the finger, and flip below it near the top edge.
-                top: `calc(${loupe.y * 100}% + ${loupe.y < 0.28 ? 56 : -(LOUPE + 56)}px)`,
+                left: clampTo(originX + loupe.x * displayWidth - LOUPE / 2, viewport.width - LOUPE),
+                // Above the finger, flipping below it near the top of the frame.
+                top: clampTo(
+                  originY + loupe.y * displayHeight + (loupe.y * displayHeight < 150 ? 60 : -(LOUPE + 60)),
+                  viewport.height - LOUPE,
+                ),
                 backgroundImage: `url(${url})`,
-                backgroundSize: `${LOUPE_ZOOM * 100}% ${LOUPE_ZOOM * 100}%`,
-                backgroundPosition: `${loupe.x * 100}% ${loupe.y * 100}%`,
+                backgroundSize: `${displayWidth * LOUPE_ZOOM}px ${displayHeight * LOUPE_ZOOM}px`,
+                backgroundPosition: `${LOUPE / 2 - loupe.x * displayWidth * LOUPE_ZOOM}px ${LOUPE / 2 - loupe.y * displayHeight * LOUPE_ZOOM}px`,
                 backgroundRepeat: 'no-repeat',
               }}
             >
@@ -289,15 +504,94 @@ export function MultiCrop({
             </div>
           ) : null}
         </div>
+
+        {/* Zoom, for one hand and for a mouse. */}
+        <div className="pointer-events-none absolute right-3 bottom-3 flex flex-col items-end gap-1.5">
+          {zoom > 1.02 ? (
+            <span className="rounded-full bg-black/55 px-2 py-0.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+              {zoom.toFixed(1)}×
+            </span>
+          ) : null}
+          <div className="pointer-events-auto flex flex-col overflow-hidden rounded-full bg-black/55">
+            <ZoomButton
+              label="Zoom in"
+              onClick={() => zoomAbout(zoom * 1.5, viewport.width / 2, viewport.height / 2)}
+            >
+              <Plus size={16} />
+            </ZoomButton>
+            <ZoomButton
+              label="Zoom out"
+              onClick={() => zoomAbout(zoom / 1.5, viewport.width / 2, viewport.height / 2)}
+            >
+              <Minus size={16} />
+            </ZoomButton>
+            <ZoomButton
+              label="Fit the whole photo"
+              onClick={() => {
+                setZoom(1);
+                setPan({ x: 0, y: 0 });
+              }}
+            >
+              <Maximize2 size={15} />
+            </ZoomButton>
+          </div>
+        </div>
       </div>
 
       <div
         className="border-t border-[var(--border)] bg-[var(--bg)] px-5 pt-3"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
-        <p className="mb-2.5 text-center text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
-          Each box becomes its own item. Drag any edge or corner to adjust it.
-        </p>
+        <div className="mb-2.5 flex gap-1.5 rounded-full bg-[var(--surface-alt)] p-1">
+          {SHAPES.map((option) => (
+            <button
+              key={option.label}
+              type="button"
+              aria-pressed={shape === option.aspect}
+              onClick={() => {
+                setShape(option.aspect);
+                if (option.aspect === null) return;
+                const next = option.aspect / imageAspect;
+                setBoxes((current) => current.map((box) => resize(normaliseBox(box), 'se', 1, 1, next, true)));
+              }}
+              className={cn(
+                'flex-1 rounded-full py-1.5 text-[0.8125rem] font-semibold transition-colors',
+                shape === option.aspect
+                  ? 'bg-[var(--brand)] text-[var(--on-brand)]'
+                  : 'text-[var(--text-muted)]',
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {/*
+          * Removing a piece lives here rather than on the box itself. Eight
+          * 44px handles cover the whole perimeter of a small box, so a delete
+          * button anywhere on that edge is either unreachable — the handle wins
+          * the hit test, which is what happened — or it steals the corner drag.
+          */}
+        {selected ? (
+          <div className="mb-2.5 flex items-center justify-center gap-3 text-[0.8125rem]">
+            <span className="text-[var(--text-muted)]">
+              Piece {boxes.findIndex((box) => box.id === selected.id) + 1} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setBoxes((current) => current.filter((entry) => entry.id !== selected.id));
+                setActive(null);
+              }}
+              className="pressable inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-alt)] px-3 py-1 font-semibold text-[var(--danger)]"
+            >
+              <Trash2 size={13} /> Remove
+            </button>
+          </div>
+        ) : (
+          <p className="mb-2.5 text-center text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
+            Each box becomes its own item. Pinch to zoom, drag any edge to adjust.
+          </p>
+        )}
         <Button
           full
           size="lg"
@@ -311,22 +605,152 @@ export function MultiCrop({
   );
 }
 
+function ZoomButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="grid size-10 place-items-center text-white active:bg-white/20"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Centre the photo when it fits, and stop it being dragged off when it does not. */
+function place(view: number, display: number, pan: number): number {
+  if (!display) return 0;
+  if (display <= view) return (view - display) / 2;
+  return Math.min(0, Math.max(view - display, (view - display) / 2 + pan));
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function clampTo(value: number, max: number): number {
+  return Math.max(4, Math.min(max - 4, value));
+}
+
+/** Drawing a fresh box, honouring a locked shape from the first moment. */
+export function draw(
+  box: CropBox,
+  originX: number,
+  originY: number,
+  x: number,
+  y: number,
+  ratio?: number | null,
+): CropBox {
+  if (!ratio) return { ...box, x: originX, y: originY, width: x - originX, height: y - originY };
+  // The longer drag wins, so the box follows the direction of the gesture.
+  const width = Math.abs(x - originX);
+  const height = Math.abs(y - originY);
+  const size = width / ratio > height ? width : height * ratio;
+  return {
+    ...box,
+    x: originX,
+    y: originY,
+    width: Math.sign(x - originX || 1) * size,
+    height: Math.sign(y - originY || 1) * (size / ratio),
+  };
+}
+
 /**
- * Move whichever edges a handle owns, keeping the box at least MIN_BOX across.
+ * Move whichever edges a handle owns.
  *
- * Dragging past the opposite edge clamps rather than flipping: a box that turns
- * inside out under your finger and renames its own handles is disorienting.
+ * An edge handle moves that edge alone — the fix for the cropper complaint
+ * everyone has about iOS, where dragging one corner shifts the others and the
+ * only reliable way to nudge a single side is the middle of an edge. Dragging
+ * past the opposite side clamps rather than flipping, because a box that turns
+ * inside out under a finger renames its own handles mid-gesture.
  */
-export function resize(box: CropBox, edge: Edge, x: number, y: number): CropBox {
+export function resize(
+  box: CropBox,
+  edge: Edge,
+  x: number,
+  y: number,
+  ratio?: number | null,
+  /** Re-shaping an existing box rather than dragging it: hold its size, not the pointer. */
+  reshape = false,
+): CropBox {
   let left = box.x;
   let top = box.y;
   let right = box.x + box.width;
   let bottom = box.y + box.height;
 
-  if (edge.includes('w')) left = Math.min(x, right - MIN_BOX);
-  if (edge.includes('e')) right = Math.max(x, left + MIN_BOX);
-  if (edge.includes('n')) top = Math.min(y, bottom - MIN_BOX);
-  if (edge.includes('s')) bottom = Math.max(y, top + MIN_BOX);
+  if (!reshape) {
+    if (edge.includes('w')) left = Math.min(x, right - MIN_BOX);
+    if (edge.includes('e')) right = Math.max(x, left + MIN_BOX);
+    if (edge.includes('n')) top = Math.min(y, bottom - MIN_BOX);
+    if (edge.includes('s')) bottom = Math.max(y, top + MIN_BOX);
+  }
 
-  return { id: box.id, x: left, y: top, width: right - left, height: bottom - top };
+  if (ratio) {
+    let width = right - left;
+    let height = bottom - top;
+    if (!reshape && (edge === 'e' || edge === 'w')) {
+      // The width was driven; grow or shrink the height about the centre.
+      height = width / ratio;
+      const middle = (top + bottom) / 2;
+      top = middle - height / 2;
+      bottom = middle + height / 2;
+    } else if (!reshape && (edge === 'n' || edge === 's')) {
+      width = height * ratio;
+      const middle = (left + right) / 2;
+      left = middle - width / 2;
+      right = middle + width / 2;
+    } else {
+      // A corner keeps the opposite corner still; re-shaping keeps the centre.
+      if (width / ratio > height) height = width / ratio;
+      else width = height * ratio;
+      if (reshape) {
+        const midX = (left + right) / 2;
+        const midY = (top + bottom) / 2;
+        left = midX - width / 2;
+        right = midX + width / 2;
+        top = midY - height / 2;
+        bottom = midY + height / 2;
+      } else {
+        if (edge.includes('w')) left = right - width;
+        else right = left + width;
+        if (edge.includes('n')) top = bottom - height;
+        else bottom = top + height;
+      }
+    }
+  }
+
+  // Slide back inside the photo rather than distorting the shape to fit.
+  if (left < 0) {
+    right -= left;
+    left = 0;
+  }
+  if (top < 0) {
+    bottom -= top;
+    top = 0;
+  }
+  if (right > 1) {
+    left -= right - 1;
+    right = 1;
+  }
+  if (bottom > 1) {
+    top -= bottom - 1;
+    bottom = 1;
+  }
+
+  return {
+    id: box.id,
+    x: clamp01(left),
+    y: clamp01(top),
+    width: clamp01(right) - clamp01(left),
+    height: clamp01(bottom) - clamp01(top),
+  };
 }
