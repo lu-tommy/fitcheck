@@ -43,6 +43,13 @@ interface Pending {
   /** The photo as it arrived, so cropping starts from the best pixels available. */
   source?: Blob;
   /**
+   * The cut-out, ready to show. The row used to render the ORIGINAL photo with
+   * a transparency grid behind it whenever a cut-out existed, so what she saw
+   * while deciding was never what went into the closet — a garment shot from
+   * across the room still looked like a room.
+   */
+  cutoutUrl?: string;
+  /**
    * True when the background removal barely removed anything — a mirror selfie,
    * a patterned duvet, a busy room. The cut-out is useless there and, worse,
    * silently useless, so the row says so and offers the crop.
@@ -147,9 +154,11 @@ export default function AddPage() {
                */
               const trimmed = await trimToGarment(cutout.blob);
 
+              const shownBlob = trimmed?.blob ?? cutout.blob;
               patch(entry.key, {
+                cutoutUrl: URL.createObjectURL(shownBlob),
                 cutout: {
-                  blob: trimmed?.blob ?? cutout.blob,
+                  blob: shownBlob,
                   width: trimmed?.width ?? processed.width,
                   height: trimmed?.height ?? processed.height,
                 },
@@ -243,6 +252,7 @@ export default function AddPage() {
     setQueue((current) => {
       const going = current.find((entry) => entry.key === key);
       if (going?.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(going.previewUrl);
+      if (going?.cutoutUrl?.startsWith('blob:')) URL.revokeObjectURL(going.cutoutUrl);
       return current.filter((entry) => entry.key !== key);
     });
   }
@@ -451,7 +461,17 @@ export default function AddPage() {
                     entry.useCutout && 'alpha-grid',
                   )}
                 >
-                  {entry.previewUrl ? (
+                  {entry.useCutout && entry.cutoutUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- blob: URL
+                    <img
+                      src={entry.cutoutUrl}
+                      alt=""
+                      // contain, not cover: a cut-out is the garment and nothing
+                      // else, so cropping it again would clip the shoulders off
+                      // the very thing she is being asked to approve.
+                      className="size-full object-contain"
+                    />
+                  ) : entry.previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- blob: URL
                     <img
                       src={entry.previewUrl}
