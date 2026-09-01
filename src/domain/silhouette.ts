@@ -136,14 +136,32 @@ export function guessFromSilhouette(s: Silhouette): CategoryGuess | null {
  * Reduce a mask to a Silhouette. `alpha` is one byte per pixel, row-major;
  * anything above `threshold` counts as garment.
  */
-export function describeSilhouette(
+/** Where the garment actually is inside the frame, and how much of it there is. */
+export interface ContentBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  /** Opaque pixels as a share of the WHOLE frame, not of the box. */
+  coverage: number;
+}
+
+/**
+ * The garment's bounding box within a cut-out.
+ *
+ * A flood fill clears the background but leaves the frame the camera chose, so
+ * a jumper photographed from three feet away stays a small object adrift in a
+ * large transparent canvas — which is why a wardrobe of those reads as a
+ * scatter of snapshots rather than a rail of clothes. Cropping to these bounds
+ * is what turns each one into something that looks photographed on purpose.
+ */
+export function contentBounds(
   alpha: Uint8Array | Uint8ClampedArray,
   width: number,
   height: number,
   threshold = 16,
-): Silhouette | null {
+): ContentBounds | null {
   if (width <= 0 || height <= 0 || alpha.length < width * height) return null;
-
   let minX = width;
   let minY = height;
   let maxX = -1;
@@ -161,6 +179,23 @@ export function describeSilhouette(
     }
   }
   if (maxX < 0 || opaque === 0) return null;
+  return { minX, minY, maxX, maxY, coverage: opaque / (width * height) };
+}
+
+export function describeSilhouette(
+  alpha: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+  threshold = 16,
+): Silhouette | null {
+  const bounds = contentBounds(alpha, width, height, threshold);
+  if (!bounds) return null;
+  const { minX, minY, maxX, maxY } = bounds;
+  let opaque = 0;
+  for (let y = minY; y <= maxY; y += 1) {
+    const row = y * width;
+    for (let x = minX; x <= maxX; x += 1) if (alpha[row + x] > threshold) opaque += 1;
+  }
 
   const boxW = maxX - minX + 1;
   const boxH = maxY - minY + 1;
@@ -195,7 +230,7 @@ export function describeSilhouette(
     bottomWidth: band(0.8, 1),
     widestAt: rowWidth.length > 1 ? widestIndex / (rowWidth.length - 1) : 0,
     legGap: hasLegGap(alpha, width, threshold, minX, maxX, minY, maxY),
-    coverage: opaque / (width * height),
+    coverage: bounds.coverage,
   };
 }
 

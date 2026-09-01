@@ -16,6 +16,7 @@ import { countBySlot, progressLine } from '@/domain/wardrobeProgress';
 import { putPhoto } from '@/db';
 import { removeBackground } from '@/lib/backgroundRemoval';
 import { guessCategoryFromCutout } from '@/lib/silhouette';
+import { trimToGarment } from '@/lib/trim';
 import { CONFIDENT, type CategoryGuess } from '@/domain/silhouette';
 import { cropToBlob, type CropBox } from '@/lib/crop';
 import { cn } from '@/lib/cn';
@@ -39,6 +40,14 @@ interface Pending {
   useCutout: boolean;
   /** What the outline suggested, so the form can show it and be disagreed with. */
   guess?: CategoryGuess;
+  /** The photo as it arrived, so cropping starts from the best pixels available. */
+  source?: Blob;
+  /**
+   * True when the background removal barely removed anything — a mirror selfie,
+   * a patterned duvet, a busy room. The cut-out is useless there and, worse,
+   * silently useless, so the row says so and offers the crop.
+   */
+  busyBackground?: boolean;
   draft: ItemDraft;
   taggedByAi: boolean;
 }
@@ -53,6 +62,14 @@ export default function AddPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [cropSource, setCropSource] = useState<Blob | null>(null);
+  /*
+   * Cropping used to exist only behind "one photo, several pieces". Any other
+   * photo went in whole — so a mirror selfie became an "item" that was mostly
+   * bedroom, and every collage inherited it. The same boxing tool now opens on
+   * a queued row; this remembers which row so it can be replaced by what comes
+   * back out.
+   */
+  const [recropKey, setRecropKey] = useState<string | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const outfitInput = useRef<HTMLInputElement>(null);
@@ -73,6 +90,7 @@ export default function AddPage() {
         useCutout: false,
         taggedByAi: false,
         draft: { ...EMPTY_DRAFT, name: '' },
+        source: file,
         previewUrl: URL.createObjectURL(file),
       }));
       setQueue((current) => [...current, ...seeded]);
@@ -99,15 +117,43 @@ export default function AddPage() {
           if (backgroundRemoval !== 'off') {
             const cutout = await removeBackground(processed.blob, backgroundRemoval);
             if (cutout) {
+              /*
+               * Order matters here. The guess reads coverage of the WHOLE frame
+               * to tell a ring from a coat, and trimming sets that to roughly
+               * one — so ask the shape what it is BEFORE cropping it.
+               */
+              const shapeGuess = await guessCategoryFromCutout(cutout.blob);
+
+              /*
+               * Then crop to the garment. The flood fill clears the background
+               * but keeps the frame the camera chose, so a jumper shot from
+               * across the room stayed a small object adrift in a big
+               * transparent canvas — and every tile, collage and shared image
+               * inherited that framing. This is what makes a closet read as a
+               * rail of clothes rather than a pile of snapshots.
+               */
+              const trimmed = await trimToGarment(cutout.blob);
+
+              /*
+               * A flood fill that removed almost nothing did not find a plain
+               * background — it found a bedroom. Using that cut-out would put a
+               * rectangle of wallpaper in every outfit, so it is not offered,
+               * and the row asks for a crop instead of failing quietly.
+               */
+              const misfired = cutout.removedFraction > 0 && cutout.removedFraction < 0.15;
+              if (misfired) {
+                patch(entry.key, { busyBackground: true, useCutout: false });
+              }
+
               patch(entry.key, {
                 cutout: {
-                  blob: cutout.blob,
-                  width: processed.width,
-                  height: processed.height,
+                  blob: trimmed?.blob ?? cutout.blob,
+                  width: trimmed?.width ?? processed.width,
+                  height: trimmed?.height ?? processed.height,
                 },
                 // A crop out of a worn outfit rarely has a backdrop worth
                 // removing, so the cut-out is offered rather than applied.
-                useCutout: options?.autoCutout ?? true,
+                useCutout: misfired ? false : (options?.autoCutout ?? true),
               });
 
               /*
@@ -120,7 +166,6 @@ export default function AddPage() {
                * Below CONFIDENT it says nothing and the picker is left alone; a
                * wrong category costs more than an unset one.
                */
-              const shapeGuess = await guessCategoryFromCutout(cutout.blob);
               if (shapeGuess && shapeGuess.confidence >= CONFIDENT) {
                 patch(entry.key, {
                   guess: shapeGuess,
@@ -166,7 +211,12 @@ export default function AddPage() {
           crops.push(await cropToBlob(bitmap, box));
         }
         bitmap.close();
-        await ingest(crops, { autoCutout: false });
+        // A crop taken FROM a queued row replaces it; the boxes are the piece now.
+        if (recropKey) {
+          discard(recropKey);
+          setRecropKey(null);
+        }
+        await ingest(crops, { autoCutout: true });
       } catch (error) {
         toast((error as Error).message || 'Could not cut that photo up', { tone: 'danger' });
       }
@@ -478,6 +528,12 @@ export default function AddPage() {
                           ))}
                         </div>
                       ) : null}
+                      {entry.busyBackground ? (
+                        <p className="mt-1 text-[0.75rem] leading-snug text-[var(--text-muted)]">
+                          Busy background — the cut-out could not find the edges. Crop to just
+                          the garment and it will look like the rest.
+                        </p>
+                      ) : null}
                       {entry.photo ? (
                         <span className="mt-1 inline-flex items-center gap-1 text-[0.75rem] text-[var(--text-faint)]">
                           <Sparkles size={11} /> Colour read from the photo
@@ -488,6 +544,24 @@ export default function AddPage() {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">
+                  {entry.stage === 'ready' && (entry.source || entry.photo) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRecropKey(entry.key);
+                        setCropSource(entry.source ?? entry.photo!.blob);
+                      }}
+                      aria-label="Crop to the garment"
+                      className={cn(
+                        'pressable grid size-9 place-items-center rounded-full',
+                        entry.busyBackground
+                          ? 'bg-[var(--brand)] text-[var(--on-brand)]'
+                          : 'bg-[var(--surface-alt)]',
+                      )}
+                    >
+                      <Scissors size={16} />
+                    </button>
+                  ) : null}
                   {entry.stage === 'ready' ? (
                     <button
                       type="button"
