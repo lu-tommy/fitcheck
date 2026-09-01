@@ -26,7 +26,18 @@ services:
       # The wardrobes. Back this folder up and nothing else matters.
       - ./data:/data
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/auth/me']
+      # Answering HTTP is not the same as working. The wardrobe sync writes into
+      # /data, and a bind mount keeps the HOST's ownership: when that folder was
+      # owned by another uid the app could read but never write, so every
+      # /api/sync/push returned 500 and nobody's closet was being backed up --
+      # while this healthcheck stayed green the whole time, because the HTTP
+      # endpoint was fine. So probe the write too; that is the failure that
+      # actually loses data.
+      test:
+        [
+          'CMD-SHELL',
+          'wget -qO- http://127.0.0.1:3000/api/auth/me >/dev/null 2>&1 && touch /data/.healthcheck && rm -f /data/.healthcheck',
+        ]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -100,7 +100,7 @@ function SignIn() {
               autoCorrect="off"
               autoFocus
               required
-              placeholder="Lia"
+              placeholder="Your name"
             />
           </Field>
           <Field label="Password">
