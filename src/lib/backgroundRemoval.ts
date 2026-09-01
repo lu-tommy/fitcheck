@@ -20,6 +20,34 @@ export interface CutoutResult {
   blob: Blob;
   /** Share of the frame that was removed — used to warn on an obvious misfire. */
   removedFraction: number;
+  /** False when the fill did not find a plain background worth trusting. */
+  usable: boolean;
+  /** Why it is not usable, in a word the UI can turn into a sentence. */
+  reason?: CutoutProblem;
+}
+
+export type CutoutProblem = 'busy-background' | 'nothing-left';
+
+/**
+ * Whether a finished fill is worth using, kept apart from the canvas work so it
+ * can be reasoned about and tested.
+ *
+ * The old rule rejected anything that removed under 4% or over 94% of the
+ * frame, and the second half of that was wrong: a jumper photographed from
+ * across a plain floor legitimately IS 1% of the picture, so removing 99% is
+ * the fill working perfectly, not failing. That bail threw away precisely the
+ * photos cropping was built to rescue. What matters is not how much went, but
+ * whether a plausible garment is left behind.
+ */
+export function judgeCutout(
+  removedFraction: number,
+  remainingCoverage: number,
+): { usable: boolean; reason?: CutoutProblem } {
+  // Almost nothing went: the edges were a bedroom, not a wall.
+  if (removedFraction < 0.04) return { usable: false, reason: 'busy-background' };
+  // Almost nothing is left: the fill ate the garment too.
+  if (remainingCoverage < 0.002) return { usable: false, reason: 'nothing-left' };
+  return { usable: true };
 }
 
 export async function removeBackground(
@@ -38,7 +66,7 @@ async function removeViaApi(source: Blob): Promise<CutoutResult | null> {
     const response = await fetch('/api/cutout', { method: 'POST', body });
     if (!response.ok) return null;
     const blob = await response.blob();
-    return { blob, removedFraction: 0 };
+    return { blob, removedFraction: 0, usable: true };
   } catch {
     return null;
   }
@@ -140,12 +168,20 @@ export async function removeByFloodFill(
   }
 
   const removed = visited.reduce((total, value) => total + value, 0) / visited.length;
+  const remaining = 1 - removed;
 
-  // A fill that ate almost everything, or almost nothing, is not a cut-out.
-  if (removed < 0.04 || removed > 0.94) return null;
+  // Always hand the result back, judged. Returning null threw away the one
+  // thing the screen needed in order to explain itself, so a photo that
+  // defeated the fill simply produced nothing and said nothing.
+  const verdict = judgeCutout(removed, remaining);
 
   context.putImageData(image, 0, 0);
-  return { blob: await canvasToPngBlob(canvas), removedFraction: removed };
+  return {
+    blob: await canvasToPngBlob(canvas),
+    removedFraction: removed,
+    usable: verdict.usable,
+    reason: verdict.reason,
+  };
 }
 
 function pixelAt(data: Uint8ClampedArray, width: number, x: number, y: number): number[] {

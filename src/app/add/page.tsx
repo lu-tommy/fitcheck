@@ -116,7 +116,20 @@ export default function AddPage() {
 
           if (backgroundRemoval !== 'off') {
             const cutout = await removeBackground(processed.blob, backgroundRemoval);
-            if (cutout) {
+
+            /*
+             * A photo the fill could not read is the whole reason this screen
+             * needs a crop, so it has to be said out loud. This check sits
+             * OUTSIDE the branch below on purpose: it used to live inside it,
+             * where an unreadable photo — which is exactly the case that
+             * produces no cut-out — could never reach it, so a mirror selfie
+             * failed silently and went into the closet whole.
+             */
+            if (!cutout || !cutout.usable) {
+              patch(entry.key, { busyBackground: true, useCutout: false });
+            }
+
+            if (cutout && cutout.usable) {
               /*
                * Order matters here. The guess reads coverage of the WHOLE frame
                * to tell a ring from a coat, and trimming sets that to roughly
@@ -134,17 +147,6 @@ export default function AddPage() {
                */
               const trimmed = await trimToGarment(cutout.blob);
 
-              /*
-               * A flood fill that removed almost nothing did not find a plain
-               * background — it found a bedroom. Using that cut-out would put a
-               * rectangle of wallpaper in every outfit, so it is not offered,
-               * and the row asks for a crop instead of failing quietly.
-               */
-              const misfired = cutout.removedFraction > 0 && cutout.removedFraction < 0.15;
-              if (misfired) {
-                patch(entry.key, { busyBackground: true, useCutout: false });
-              }
-
               patch(entry.key, {
                 cutout: {
                   blob: trimmed?.blob ?? cutout.blob,
@@ -153,7 +155,7 @@ export default function AddPage() {
                 },
                 // A crop out of a worn outfit rarely has a backdrop worth
                 // removing, so the cut-out is offered rather than applied.
-                useCutout: misfired ? false : (options?.autoCutout ?? true),
+                useCutout: options?.autoCutout ?? true,
               });
 
               /*

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { judgeCutout } from '@/lib/backgroundRemoval';
 import {
   CONFIDENT,
   describeSilhouette,
@@ -124,5 +125,32 @@ describe('guessing a garment from its outline', () => {
     const g = guessOf(a)!;
     expect(g.because.length).toBeGreaterThan(10);
     expect(g.because).not.toMatch(/[A-Z]{4,}/); // no jargon shouting
+  });
+});
+
+describe('judging whether a cut-out is worth using', () => {
+  it('rejects a photo where the fill found no background', () => {
+    // A mirror selfie: the edges are a bedroom, so almost nothing is removed.
+    const v = judgeCutout(0.01, 0.99);
+    expect(v.usable).toBe(false);
+    expect(v.reason).toBe('busy-background');
+  });
+
+  it('KEEPS a garment shot from far away on a plain floor', () => {
+    // Regression: the old rule bailed above 94% removed, which threw away the
+    // very photos cropping exists to rescue — a jumper really can be 1% of the
+    // frame, and removing 99% is the fill working, not failing.
+    const v = judgeCutout(0.99, 0.01);
+    expect(v.usable).toBe(true);
+  });
+
+  it('rejects a fill that ate the garment as well', () => {
+    const v = judgeCutout(0.999, 0.001);
+    expect(v.usable).toBe(false);
+    expect(v.reason).toBe('nothing-left');
+  });
+
+  it('accepts an ordinary garment on a plain wall', () => {
+    expect(judgeCutout(0.7, 0.3).usable).toBe(true);
   });
 });
