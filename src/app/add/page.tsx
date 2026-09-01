@@ -424,8 +424,14 @@ export default function AddPage() {
                        * so nobody checks it, and a wrong word ends up in the
                        * closet. Named as a guess, correcting it is one tap.
                        */}
+                      {/*
+                       * Not truncated. The whole value of naming this a guess is
+                       * the reason attached to it — "Guessed from the photo — …"
+                       * with the reason clipped tells the reader nothing they can
+                       * judge, so it wraps instead.
+                       */}
                       {entry.guess ? (
-                        <p className="truncate text-[0.75rem] text-[var(--text-muted)] opacity-80">
+                        <p className="text-[0.75rem] leading-snug text-[var(--text-muted)] opacity-80">
                           Guessed from the photo — {entry.guess.because}. Tap to change.
                         </p>
                       ) : null}
