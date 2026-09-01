@@ -80,21 +80,28 @@ export function guessFromSilhouette(s: Silhouette): CategoryGuess | null {
     return guess('accessory', 0.72, 'it covers very little of the photo');
   }
 
-  // A belt, a tie or a scarf is a ribbon. Two shapes of that: laid out straight,
-  // where it is extremely long in one direction and fills its own box; or coiled,
-  // where the box is squarer but mostly empty. Filling the box does NOT rule it
-  // out — a strap drawn straight has fill 1.0, which is why this is decided on
-  // how extreme the aspect is and is checked before the footwear rule below.
-  const ribbon = s.aspect > 3.2 || s.aspect < 0.3;
-  const coiled = s.fill < 0.28 && (s.aspect > 2.6 || s.aspect < 0.38);
-  if (ribbon || coiled) {
-    return guess('accessory', 0.68, 'it is a long thin strap rather than a garment');
-  }
-
   // Trousers: the gap between the legs is unmistakable, and nothing else in a
   // wardrobe splits into two long runs at the bottom.
   if (s.legGap && s.aspect > 1.05) {
     return guess('bottom', 0.88, 'the lower half splits into two legs');
+  }
+
+  // A belt, a tie or a scarf is a ribbon: either laid out straight, extremely
+  // long in one direction and filling its own box, or coiled, where the box is
+  // squarer but mostly empty. Filling the box does not rule it out — a strap
+  // drawn straight has fill 1.0 — so this is decided on how extreme the aspect
+  // is rather than on fill alone.
+  //
+  // Deliberately AFTER the leg test. A narrow pair of trousers shot straight
+  // down measured aspect 3.4 in a real upload and was called a strap, because
+  // "long and thin" describes skinny jeans just as well as a belt. A leg gap
+  // does not: nothing else in a wardrobe splits into two parallel runs for most
+  // of its lower half, so that question is asked first and this one takes what
+  // is left.
+  const ribbon = s.aspect > 3.2 || s.aspect < 0.3;
+  const coiled = s.fill < 0.28 && (s.aspect > 2.6 || s.aspect < 0.38);
+  if (ribbon || coiled) {
+    return guess('accessory', 0.68, 'it is a long thin strap rather than a garment');
   }
 
   // Shoes photographed from the side are wider than they are tall. Tops and

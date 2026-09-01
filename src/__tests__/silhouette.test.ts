@@ -39,6 +39,21 @@ describe('guessing a garment from its outline', () => {
     expect(g.confidence).toBeGreaterThanOrEqual(CONFIDENT);
   });
 
+
+  it('still reads narrow trousers as trousers, not a strap', () => {
+    // Regression: a real upload of skinny trousers measured aspect 3.4, which
+    // the "long and thin" accessory rule matched before the leg test ran.
+    const a = blank();
+    rect(a, 88, 12, 112, 70);   // narrow waist
+    rect(a, 88, 70, 97, 250);   // left leg
+    rect(a, 103, 70, 112, 250); // right leg
+    const s = read(a);
+    expect(s.aspect).toBeGreaterThan(3.2);
+    expect(s.legGap).toBe(true);
+    const g = guessOf(a)!;
+    expect(g.slot).toBe('bottom');
+  });
+
   it('does not mistake a plain rectangle for trousers', () => {
     const a = blank();
     rect(a, 60, 20, 140, 240);
