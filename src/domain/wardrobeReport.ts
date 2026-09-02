@@ -232,6 +232,7 @@ const REASON: Record<FitRule, string> = {
   pattern: 'usually because it lands next to another print of the same size',
   'third-piece': 'usually because the outfits round it stop at three pieces',
   matchy: 'usually because everything near it is the same colour',
+  metals: 'usually because the jewellery around it does not repeat its metal',
   register: 'usually because it is dressier or plainer than what it goes with',
 };
 

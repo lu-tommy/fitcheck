@@ -412,6 +412,7 @@ export default function AddPage() {
         fit: entry.draft.fit || undefined,
         length: entry.draft.length || undefined,
         rise: entry.draft.rise || undefined,
+        metal: entry.draft.metal || undefined,
         material: entry.draft.material || undefined,
         brand: entry.draft.brand || undefined,
         formality: entry.draft.formality,

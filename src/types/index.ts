@@ -117,6 +117,17 @@ export type Rise = 'low' | 'mid' | 'high';
  */
 export type PatternScale = 'micro' | 'medium' | 'bold';
 
+/**
+ * What a piece of jewellery is made of.
+ *
+ * Mixing metals stopped being a mistake some time ago, but the guidance that
+ * replaced the old rule is specific: repeat each metal at least twice. One lone
+ * silver ring among gold reads as an accident; two reads as a decision. That is
+ * a distinction no amount of colour reasoning can make, because to a colour
+ * analyser gold is simply a warm yellow.
+ */
+export type Metal = 'gold' | 'silver' | 'rose-gold' | 'mixed' | 'other';
+
 export type Formality =
   | 'very-casual'
   | 'casual'
@@ -214,6 +225,8 @@ export interface ClothingItem {
   fit?: Fit;
   length?: Length;
   rise?: Rise;
+  /** Jewellery only. Undefined means nobody has said, not that it has none. */
+  metal?: Metal;
   material?: string;
   brand?: string;
   formality: Formality;

@@ -6,6 +6,7 @@ import {
   accessoryFocalWeight,
   categoryLabel,
   formalityScore,
+  hasMetal,
   slotOf,
 } from './taxonomy';
 
@@ -33,6 +34,7 @@ export type FitRule =
   | 'pattern'
   | 'third-piece'
   | 'matchy'
+  | 'metals'
   | 'register';
 
 export interface ScoreNote {
@@ -92,6 +94,7 @@ export function scoreOutfit(items: ClothingItem[]): FitScore {
   add(pattern(items, cannot));
   add(thirdPiece(items));
   add(matchy(items));
+  add(metals(items, cannot));
   add(register(items));
 
   const total = notes.reduce((sum, note) => sum + note.points, BASE);
@@ -391,7 +394,69 @@ function matchy(items: ClothingItem[]): ScoreNote | null {
   };
 }
 
-/* ------------------------------------------------------------ 7. register -- */
+/* -------------------------------------------------------------- 7. metals -- */
+
+/**
+ * Mixing metals, the way it is actually done.
+ *
+ * The old rule was never mix them, and it is gone — brands now design pieces
+ * meant to be worn in gold and silver together. What replaced it is specific
+ * rather than permissive: repeat each metal at least twice. One lone silver
+ * ring among gold reads as an accident; two reads as a decision.
+ *
+ * This cannot be folded into the colour rules, and that is why it exists. To a
+ * colour analyser gold is a warm yellow and silver is a light grey, so it sees
+ * a neutral with a small warm accent and approves — which is exactly the outfit
+ * somebody looks at later and cannot say what is wrong with.
+ */
+function metals(items: ClothingItem[], cannot: Cannot): ScoreNote | null {
+  const jewellery = items.filter((item) => hasMetal(item.category));
+  if (jewellery.length < 2) return null;
+
+  const known = jewellery.filter((item) => item.metal && item.metal !== 'other');
+  if (known.length < 2) {
+    cannot(
+      'metals',
+      `Say what the ${list(
+        jewellery
+          .filter((item) => !item.metal)
+          .map((item) => item.name.toLowerCase()),
+      )} ${jewellery.filter((item) => !item.metal).length === 1 ? 'is' : 'are'} made of, and the metals can be judged.`,
+    );
+    return null;
+  }
+
+  const counts = new Map<string, number>();
+  known.forEach((item) => {
+    // A piece that is itself mixed carries both, so it can never be the lone
+    // one — which is the whole reason those pieces are made.
+    const key = item.metal!;
+    counts.set(key, (counts.get(key) ?? 0) + (key === 'mixed' ? 2 : 1));
+  });
+
+  if (counts.size < 2) return null;
+
+  const lonely = [...counts.entries()].filter(([, count]) => count < 2).map(([metal]) => metal);
+  const ids = known.map((item) => item.id);
+
+  if (lonely.length === 0) {
+    return {
+      rule: 'metals',
+      points: 4,
+      itemIds: ids,
+      note: 'Two metals, each of them repeated — which is the difference between mixing them and forgetting.',
+    };
+  }
+
+  return {
+    rule: 'metals',
+    points: -5,
+    itemIds: ids,
+    note: `One lone ${lonely[0].replace('-', ' ')} piece among the rest. Two of it reads as a decision; one reads as an accident.`,
+  };
+}
+
+/* ------------------------------------------------------------ 8. register -- */
 
 /** A very-casual tank with formal trousers is what you notice across a room. */
 function register(items: ClothingItem[]): ScoreNote | null {

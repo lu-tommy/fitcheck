@@ -250,3 +250,87 @@ describe('list', () => {
     expect(list(['red', 'green', 'blue'])).toBe('red, green and blue');
   });
 });
+
+/**
+ * Mixing metals, the way it is actually done.
+ *
+ * The old rule was never mix them, and it is gone. What replaced it is specific
+ * rather than permissive — repeat each metal at least twice — and it is a
+ * distinction no colour rule can make, because to a colour analyser gold is a
+ * warm yellow and silver is a light grey.
+ */
+describe('metals', () => {
+  const jewellery = (id: string, category: 'ring' | 'necklace' | 'watch' | 'earrings', metal?: 'gold' | 'silver' | 'mixed') =>
+    makeItem({ id, category, name: `${metal ?? 'unknown'} ${category}`, metal });
+
+  it('says nothing about a single piece', () => {
+    const report = scoreOutfit([...plain(), jewellery('a', 'ring', 'gold')]);
+    expect(ruleOf(report.credits)).not.toContain('metals');
+    expect(ruleOf(report.deductions)).not.toContain('metals');
+    expect(ruleOf(report.unjudged)).not.toContain('metals');
+  });
+
+  it('says nothing when everything is the same metal', () => {
+    const report = scoreOutfit([
+      ...plain(),
+      jewellery('a', 'ring', 'gold'),
+      jewellery('b', 'necklace', 'gold'),
+    ]);
+    expect(ruleOf(report.deductions)).not.toContain('metals');
+  });
+
+  it('marks down one lone silver piece among the gold', () => {
+    const report = scoreOutfit([
+      ...plain(),
+      jewellery('a', 'ring', 'gold'),
+      jewellery('b', 'necklace', 'gold'),
+      jewellery('c', 'watch', 'silver'),
+    ]);
+    const note = report.deductions.find((entry) => entry.rule === 'metals');
+    expect(note).toBeDefined();
+    expect(note!.note).toContain('silver');
+    expect(note!.note).toContain('accident');
+  });
+
+  it('rewards two metals when each is repeated', () => {
+    const report = scoreOutfit([
+      ...plain(),
+      jewellery('a', 'ring', 'gold'),
+      jewellery('b', 'necklace', 'gold'),
+      jewellery('c', 'watch', 'silver'),
+      jewellery('d', 'earrings', 'silver'),
+    ]);
+    expect(ruleOf(report.credits)).toContain('metals');
+  });
+
+  /*
+   * A piece that is itself mixed carries both, so it can never be the lone one.
+   * That is the entire reason those pieces are made and sold.
+   */
+  it('lets a mixed-metal piece stand on its own', () => {
+    const report = scoreOutfit([
+      ...plain(),
+      jewellery('a', 'ring', 'gold'),
+      jewellery('b', 'necklace', 'gold'),
+      jewellery('c', 'watch', 'mixed'),
+    ]);
+    expect(ruleOf(report.deductions)).not.toContain('metals');
+  });
+
+  it('asks rather than assuming, and names what it needs told', () => {
+    const report = scoreOutfit([
+      ...plain(),
+      jewellery('a', 'ring'),
+      jewellery('b', 'necklace'),
+    ]);
+    expect(ruleOf(report.unjudged)).toContain('metals');
+    const because = report.unjudged.find((entry) => entry.rule === 'metals')!.because;
+    expect(because).toContain('ring');
+    expect(because).toContain('necklace');
+  });
+
+  it('never asks about a garment that has no metal to speak of', () => {
+    const report = scoreOutfit([...plain(), makeItem({ id: 'belt', category: 'belt' })]);
+    expect(ruleOf(report.unjudged)).not.toContain('metals');
+  });
+});

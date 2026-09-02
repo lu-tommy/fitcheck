@@ -3,6 +3,7 @@ import type {
   Fit,
   Formality,
   Length,
+  Metal,
   Pattern,
   PatternScale,
   Rise,
@@ -487,3 +488,33 @@ export const VISUAL_AREA: Record<Slot, number> = {
   headwear: 0.5,
   accessory: 0.4,
 };
+
+export const METAL_ORDER: Metal[] = ['gold', 'silver', 'rose-gold', 'mixed', 'other'];
+
+export const METAL_LABEL: Record<Metal, string> = {
+  gold: 'Gold',
+  silver: 'Silver',
+  'rose-gold': 'Rose gold',
+  mixed: 'Mixed',
+  other: 'Other',
+};
+
+/**
+ * Which pieces are asked what they are made of.
+ *
+ * The ones where the metal IS the material. A belt buckle is metal too, and
+ * asking about it would be the beginning of asking about every stud and zip —
+ * which is how a two-field form becomes the fourteen-input one people quit over.
+ */
+const METAL_CATEGORIES: Category[] = [
+  'necklace',
+  'earrings',
+  'bracelet',
+  'ring',
+  'brooch',
+  'watch',
+];
+
+export function hasMetal(category: Category): boolean {
+  return METAL_CATEGORIES.includes(category);
+}

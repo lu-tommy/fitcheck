@@ -401,7 +401,7 @@ The engine could always say whether an outfit was *valid* — right slots, warm
 enough, pitched at the right formality, made only of things you own. None of
 that is the question somebody is asking in front of a mirror.
 
-`domain/fitScore` answers the other one, in seven rules, each of which returns a
+`domain/fitScore` answers the other one, in eight rules, each of which returns a
 credit, a deduction, or an admission that it could not tell:
 
 - **Anchor.** 60/30/10, judged on AREA rather than one garment one vote — a pair
@@ -419,6 +419,15 @@ credit, a deduction, or an admission that it could not tell:
   belt does not count, which is what the focal weights are for.
 - **Matching.** A bag matching the shoes matching the belt stopped reading as
   elegant a while ago.
+- **Metals.** The old rule was never mix them, and it is gone — what replaced it
+  is specific rather than permissive: *repeat each metal at least twice*. One
+  lone silver ring among gold reads as an accident; two reads as a decision.
+  This cannot be folded into the colour rules and that is why it exists: to a
+  colour analyser gold is a warm yellow and silver a light grey, so it sees a
+  neutral with a small warm accent and approves — which is exactly the outfit
+  somebody looks at later and cannot say what is wrong with. A piece that is
+  itself mixed carries both metals and can never be the lone one, which is the
+  entire reason those are made.
 - **Register.** A very-casual tank with formal trousers is what you notice
   across a room.
 

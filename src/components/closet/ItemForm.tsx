@@ -13,6 +13,8 @@ import { categoryMeta,
   LENGTH_LABEL,
   LENGTH_ORDER,
   MATERIALS,
+  METAL_LABEL,
+  METAL_ORDER,
   PATTERNS,
   PATTERN_LABEL,
   PATTERN_SCALE_LABEL,
@@ -26,6 +28,7 @@ import { categoryMeta,
   categoryLabel,
   hasFit,
   hasLength,
+  hasMetal,
   hasRise,
 } from '@/domain/taxonomy';
 import { COLOR_NAMES, swatches } from '@/lib/palette';
@@ -36,6 +39,7 @@ import type {
   Fit,
   Formality,
   Length,
+  Metal,
   Pattern,
   PatternScale,
   Rise,
@@ -61,6 +65,7 @@ export interface ItemDraft {
   fit: Fit | '';
   length: Length | '';
   rise: Rise | '';
+  metal: Metal | '';
   material: string;
   brand: string;
   formality: Formality;
@@ -83,6 +88,7 @@ export const EMPTY_DRAFT: ItemDraft = {
   fit: '',
   length: '',
   rise: '',
+  metal: '',
   material: '',
   brand: '',
   formality: 'casual',
@@ -275,6 +281,21 @@ export function ItemForm({
           options={RISE_ORDER.map((rise) => ({ value: rise, label: RISE_LABEL[rise] }))}
           value={draft.rise}
           onPick={(rise) => onChange({ rise })}
+        />
+      ) : null}
+
+      {/*
+        * Asked only of the pieces where the metal IS the material. To a colour
+        * analyser gold is a warm yellow, so this is the one fact about
+        * jewellery no amount of colour reasoning can work out.
+        */}
+      {hasMetal(draft.category) ? (
+        <Picker
+          label="What it is made of"
+          hint="Mixing is fine — repeating each metal twice is what makes it read as a choice."
+          options={METAL_ORDER.map((metal) => ({ value: metal, label: METAL_LABEL[metal] }))}
+          value={draft.metal}
+          onPick={(metal) => onChange({ metal })}
         />
       ) : null}
 
