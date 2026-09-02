@@ -5,19 +5,20 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { EMPTY_DRAFT, ItemForm, draftLabel, type ItemDraft } from '@/components/closet/ItemForm';
-import { MultiCrop } from '@/components/closet/MultiCrop';
+import { MultiCrop, type DrawnBox } from '@/components/closet/MultiCrop';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { Sheet } from '@/components/ui/Sheet';
 import { hexForColorName } from '@/domain/color';
 import { availableBrands } from '@/domain/filters';
-import { CATEGORIES, categoryLabel, slotOf } from '@/domain/taxonomy';
+import { CATEGORIES, categoryLabel, categoryMeta, slotOf } from '@/domain/taxonomy';
 import { countBySlot, progressLine } from '@/domain/wardrobeProgress';
 import { putPhoto } from '@/db';
 import { removeBackground } from '@/lib/backgroundRemoval';
 import { guessCategoryFromCutout } from '@/lib/silhouette';
 import { trimToGarment } from '@/lib/trim';
 import { CONFIDENT, type CategoryGuess } from '@/domain/silhouette';
+import { PARSE_CONFIDENT } from '@/domain/garmentClasses';
 import { cropToBlob, type CropBox } from '@/lib/crop';
 import { cn } from '@/lib/cn';
 import { createId } from '@/lib/id';
@@ -25,6 +26,7 @@ import { processPhoto } from '@/lib/image';
 import { nowIso } from '@/lib/date';
 import { titleCase } from '@/lib/format';
 import { useCloset, type NewClothingItem } from '@/store/closet';
+import type { Category } from '@/types';
 import { usePreferences } from '@/store/preferences';
 import { toast } from '@/store/toast';
 
@@ -105,6 +107,15 @@ export default function AddPage() {
         autoCutout?: boolean;
         /** Aligned with `accepted`: where each one came from. */
         origins?: (CropOrigin | undefined)[];
+        /**
+         * Aligned with `accepted`: what the parser called each one.
+         *
+         * A crop that arrives already named should not land on "T-shirt" and
+         * make somebody correct it — that is the entire saving the parse was
+         * for. Below PARSE_CONFIDENT the caller sends nothing and the row keeps
+         * whatever the silhouette or the default says.
+         */
+        categories?: (Category | undefined)[];
       },
     ) => {
       if (!accepted.length) return;
@@ -115,7 +126,16 @@ export default function AddPage() {
         stage: 'processing',
         useCutout: false,
         taggedByAi: false,
-        draft: { ...EMPTY_DRAFT, name: '' },
+        draft: {
+          ...EMPTY_DRAFT,
+          name: '',
+          ...(options?.categories?.[index]
+            ? {
+                category: options.categories[index]!,
+                formality: categoryMeta(options.categories[index]!).formality,
+              }
+            : {}),
+        },
         source: file,
         previewUrl: URL.createObjectURL(file),
       }));
@@ -231,7 +251,7 @@ export default function AddPage() {
 
   /** One photo, several boxes: crop each region and queue it as its own piece. */
   const ingestCrops = useCallback(
-    async (source: Blob, boxes: CropBox[]) => {
+    async (source: Blob, boxes: DrawnBox[]) => {
       setCropSource(null);
       try {
         const bitmap = await createImageBitmap(source, { imageOrientation: 'from-image' });
@@ -263,7 +283,18 @@ export default function AddPage() {
          * crop IS the item, and the only thing that matters is that the box was
          * easy to place exactly where she meant it.
          */
-        await ingest(crops, { autoCutout: false, origins: boxes.map((box) => ({ source, box })) });
+        await ingest(crops, {
+          autoCutout: false,
+          origins: boxes.map((box) => ({ source, box })),
+          // Only where the parser was actually sure. A confident wrong word in
+          // a closet costs more than an empty field — the same rule the
+          // silhouette guess follows.
+          categories: boxes.map((box) =>
+            box.suggestion && box.suggestion.confidence >= PARSE_CONFIDENT
+              ? box.suggestion.category
+              : undefined,
+          ),
+        });
       } catch (error) {
         toast((error as Error).message || 'Could not cut that photo up', { tone: 'danger' });
       }

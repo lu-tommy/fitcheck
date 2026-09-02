@@ -11,6 +11,7 @@
     "add-user": "node scripts/add-user.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "date-fns": "^4.4.0",
     "idb": "^8.0.3",
     "lucide-react": "^1.35.0",

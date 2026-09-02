@@ -425,6 +425,14 @@ export interface Preferences {
    */
   outfitOfTheDay?: { date: string; itemIds: string[] };
   /**
+   * Whether the garment parser may download its weights.
+   *
+   * Unset until asked. The download is 27 MB from a third party, which is a
+   * real departure for an app that otherwise needs no keys and talks to
+   * nobody — so it is a question with an answer, not a default.
+   */
+  garmentParsing?: 'on' | 'off';
+  /**
    * Observations the wearer has told the app it has wrong. Keys, not text, so
    * a dismissal survives the wording being improved.
    */

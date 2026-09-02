@@ -4,7 +4,7 @@ Photograph the clothes you already own, and get outfits built from that closet
 and nothing else. No shopping suggestions dressed up as styling.
 
 Next.js 16 · React 19 · TypeScript · Tailwind v4 · Zustand · IndexedDB.
-No AI, no API keys, no third-party services.
+No API keys, and nothing to pay for. One optional model, downloaded on request.
 
 ---
 
@@ -42,10 +42,15 @@ instantly, works offline, and when it does not recognise a sentence it says
 nothing rather than guessing. When the wardrobe cannot cover the occasion it
 says that too, rather than quietly putting a blazer on you for the gym.
 
-There is no AI in this app and no API key to buy. Outfits, packing lists,
-colour reasoning and the wash planner all come from rules in `src/domain`, which
-run instantly, work offline, and can be read and argued with. Weather comes from
-Open-Meteo, which needs no key either.
+**Every judgement in this app is a rule you can read.** Outfits, the Fit Score,
+packing lists, colour reasoning, the wash planner and what it has learned about
+you all come from `src/domain` — arithmetic that runs instantly, works offline,
+and can be argued with. Weather comes from Open-Meteo, which needs no key.
+
+There is exactly one model anywhere near it, it is off until you say otherwise,
+and it never decides anything: the garment parser reads a photo and offers boxes
+somebody then confirms. See *Finding the clothes* below for what it downloads
+and how to host it yourself.
 
 ---
 
@@ -221,9 +226,11 @@ src/
 
 ## Getting a wardrobe in
 
-Cataloguing is where wardrobe apps lose their users, so there are three ways in
-and none of them require a key:
+Cataloguing is where wardrobe apps lose their users — a minute or two a garment,
+two or three hours for a real closet — so there are four ways in and none of them
+require a key:
 
+- **Let it find them.** See *Finding the clothes*, below.
 - **One photo, several pieces.** Photograph a whole outfit — laid on the bed, or
   a picture you liked — and drag a box around each garment. Every box is cropped
   to the same 4:5 frame with a little padding, and where the frame runs past the
@@ -266,6 +273,46 @@ category with a colour stuck on the end. The engine already knows the hero
 piece, what is under it and what the weather is doing, which is enough for
 "Cream over indigo", "Navy under the olive" or "Charcoal, wrapped up". Still
 deterministic: same closet, same day, same name.
+
+## Finding the clothes
+
+Point it at a photo of somebody wearing an outfit and it boxes and names every
+garment in one pass — a top, trousers, both shoes as one pair, a bag, a belt.
+Boxing by hand is faster here than in most apps and it is still the slow part;
+this turns *draw five boxes and pick five categories* into *confirm five chips*.
+
+It is a `SegFormer` fine-tuned on ATR, run through Transformers.js on WebGPU
+where the browser has it and WebAssembly where it does not. Four things about
+how it is wired in, which are the reason it is a button and not a default:
+
+- **It asks first, in numbers.** 27 MB, once, from `huggingface.co`; after that
+  it runs on the device and works offline for good. Your photos never leave the
+  phone — only the model comes down. "Uses AI to detect your clothes" tells
+  nobody anything they can decide with. Set `NEXT_PUBLIC_MODEL_HOST` to a copy
+  you host and the app is back to talking to nothing but your own server.
+- **It never replaces the hand path.** Boxes it finds are *added* to anything
+  already drawn, never substituted for it — somebody who drew a box could see
+  the photograph, which is a better authority than the model. A parse that finds
+  nothing says which of the two things went wrong (no garment, or no person)
+  rather than leaving an unchanged screen that reads as broken.
+- **It suggests; you confirm.** Every box is draggable and deletable, and the
+  category only pre-fills where the model was actually sure. Its accuracy is
+  wildly uneven by class — a belt is a thin strip the colour of the trousers
+  behind it and lands around 35%, against 88% for a top — so a low-confidence
+  guess is marked with a query on the box rather than quietly asserted.
+- **It cannot take the app down with it.** The library sits behind a dynamic
+  import, so it is a 504 KB chunk that people who never turn it on never fetch,
+  and every failure resolves to a sentence rather than a rejected promise.
+
+The judgement lives in `domain/garmentClasses` with no model in it at all: given
+a label map, which regions are garments, where each box goes, and how far the
+label should be believed. That is why it can be tested against a mask drawn by
+hand — including the failure it exists to prevent, where one stray pixel in a
+far corner drags a min/max box across the whole photograph. Boxes are taken from
+the 2nd to 98th percentile of the mask instead.
+
+Note on licence: the weights carry the SegFormer licence rather than a permissive
+one. Fine for a wardrobe on your own server; read it before it goes near a shop.
 
 ## Changing one piece
 

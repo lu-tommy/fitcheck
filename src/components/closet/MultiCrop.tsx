@@ -1,13 +1,30 @@
 'use client';
 
-import { Crop, Hand, Maximize2, Minus, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Crop, Hand, Maximize2, Minus, Plus, Sparkles, Trash2, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { MIN_BOX, MIN_DRAG_PX, isDrawnBox, normaliseBox, type CropBox } from '@/lib/crop';
+import { PARSE_CONFIDENT } from '@/domain/garmentClasses';
+import { categoryLabel } from '@/domain/taxonomy';
+import { MODEL_SIZE_MB, parseGarments, type ParseProgress } from '@/lib/garmentParsing';
+import { usePreferences } from '@/store/preferences';
+import type { Category } from '@/types';
 import { createId } from '@/lib/id';
 import { cn } from '@/lib/cn';
 import { pluralize } from '@/lib/format';
+
+/**
+ * A box, and what drew it.
+ *
+ * Boxes placed by hand carry nothing extra — the person drawing one already
+ * knows what is in it. A box the parser placed arrives with a category and a
+ * confidence, so the row it becomes can start on the right answer instead of
+ * on "T-shirt" every time.
+ */
+export interface DrawnBox extends CropBox {
+  suggestion?: { category: Category; label: string; confidence: number };
+}
 
 /** Which edges a handle moves. Corners move two. */
 export type Edge = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -101,14 +118,14 @@ export function MultiCrop({
 }: {
   file: Blob;
   onCancel: () => void;
-  onConfirm: (boxes: CropBox[]) => void;
+  onConfirm: (boxes: DrawnBox[]) => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [image, setImage] = useState({ width: 0, height: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [boxes, setBoxes] = useState<CropBox[]>([]);
+  const [boxes, setBoxes] = useState<DrawnBox[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [shape, setShape] = useState<number | null>(null);
   const [loupe, setLoupe] = useState<{ x: number; y: number } | null>(null);
@@ -126,6 +143,60 @@ export function MultiCrop({
   const frame = useRef<HTMLDivElement>(null);
 
   const mode: Mode = pinnedMode ?? (zoom > PAN_FROM_ZOOM ? 'pan' : 'draw');
+
+  /*
+   * Finding the clothes.
+   *
+   * `asking` is the consent panel, which is shown once and only once: a 27 MB
+   * download from somebody else's server is a real departure for an app whose
+   * whole pitch is that it needs no keys and talks to nobody, and nobody should
+   * meet that fact for the first time on a train.
+   */
+  const consent = usePreferences((state) => state.preferences.garmentParsing);
+  const updatePreferences = usePreferences((state) => state.update);
+  const [asking, setAsking] = useState(false);
+  const [parsing, setParsing] = useState<ParseProgress | null>(null);
+  const [parseNote, setParseNote] = useState<string | null>(null);
+
+  async function findGarments() {
+    if (parsing) return;
+    if (consent !== 'on') {
+      setAsking(true);
+      return;
+    }
+    setAsking(false);
+    setParseNote(null);
+    setParsing({ downloaded: 0, message: 'Getting ready…' });
+
+    const outcome = await parseGarments(file, setParsing);
+    setParsing(null);
+
+    if (!outcome.ok) {
+      setParseNote(outcome.message);
+      return;
+    }
+
+    /*
+     * The parse REPLACES nothing. Anything already drawn by hand was drawn on
+     * purpose and by somebody who could see the photograph, which is a better
+     * authority than the model — so its regions are added alongside.
+     */
+    const found: DrawnBox[] = outcome.regions.map((region) => ({
+      id: createId('box'),
+      ...region.box,
+      suggestion: {
+        category: region.category,
+        label: region.label,
+        confidence: region.confidence,
+      },
+    }));
+    setBoxes((current) => [...current, ...found]);
+    setActive(found[0]?.id ?? null);
+    setParseNote(
+      `Found ${pluralize(found.length, 'piece')}. Drag any box that is off, or delete one.`,
+    );
+  }
+
 
   useEffect(() => {
     const objectUrl = URL.createObjectURL(file);
@@ -515,8 +586,20 @@ export function MultiCrop({
                   });
                 }}
               >
-                <span className="absolute -top-px -left-px bg-[var(--brand)] px-1.5 py-0.5 text-[0.75rem] font-semibold text-[var(--on-brand)]">
+                <span className="absolute -top-px -left-px flex items-center gap-1 bg-[var(--brand)] px-1.5 py-0.5 text-[0.75rem] font-semibold text-[var(--on-brand)]">
                   {index + 1}
+                  {/*
+                    * A parsed box says what it thinks it is, right on the box.
+                    * A guess the model is not sure of is marked with a query
+                    * rather than hidden — a quiet wrong answer costs more than
+                    * a visible uncertain one.
+                    */}
+                  {box.suggestion ? (
+                    <span className="font-medium">
+                      {categoryLabel(box.suggestion.category)}
+                      {box.suggestion.confidence < PARSE_CONFIDENT ? '?' : ''}
+                    </span>
+                  ) : null}
                 </span>
 
                 {/* Thirds, only while it is being placed — a permanent grid is noise. */}
@@ -630,6 +713,97 @@ export function MultiCrop({
         className="border-t border-[var(--border)] bg-[var(--bg)] px-5 pt-3"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
+        {asking ? (
+          /*
+           * Asked once, in numbers rather than adjectives. "Uses AI to detect
+           * your clothes" tells somebody nothing they can decide with; how many
+           * megabytes, from whom, and what happens afterwards does.
+           */
+          <div className="mb-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+            <p className="text-[0.9375rem] font-medium">Let it find the clothes?</p>
+            <ul className="mt-2 space-y-1.5 text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
+              <li>
+                It downloads a {MODEL_SIZE_MB} MB model once, then runs on this device and works
+                offline for good.
+              </li>
+              <li>
+                Your photos never leave the phone — only the model comes down, and it can be
+                pointed at a copy on your own server.
+              </li>
+              <li>It boxes and names each garment. You confirm, drag or delete.</li>
+            </ul>
+            <div className="mt-3 flex gap-2">
+              <Button
+                full
+                onClick={async () => {
+                  await updatePreferences({ garmentParsing: 'on' });
+                  setAsking(false);
+                  void findGarments();
+                }}
+              >
+                Download and find
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  await updatePreferences({ garmentParsing: 'off' });
+                  setAsking(false);
+                }}
+              >
+                Not now
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {parsing ? (
+          <div className="mb-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+            <p className="text-[0.875rem] font-medium">{parsing.message}</p>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--surface-alt)]">
+              <span
+                className={cn(
+                  'block h-full rounded-full bg-[var(--brand)]',
+                  parsing.downloaded === null && 'animate-pulse',
+                )}
+                style={{ width: parsing.downloaded === null ? '100%' : `${parsing.downloaded * 100}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {parseNote ? (
+          <div className="mb-3 flex items-start gap-2 rounded-2xl bg-[var(--surface-alt)] px-3.5 py-2.5">
+            <p className="min-w-0 flex-1 text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
+              {parseNote}
+            </p>
+            <button
+              type="button"
+              onClick={() => setParseNote(null)}
+              aria-label="Dismiss"
+              className="pressable -m-1 shrink-0 p-1 text-[var(--text-faint)]"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : null}
+
+        {/*
+          * Offered rather than automatic, and never in the way: the hand path
+          * is the one that always works, so the button sits above the tools
+          * instead of replacing them.
+          */}
+        {!asking && !parsing && consent !== 'off' ? (
+          <Button
+            full
+            variant="secondary"
+            icon={<Sparkles size={16} />}
+            onClick={() => void findGarments()}
+            className="mb-2.5"
+          >
+            {boxes.length ? 'Find anything I missed' : 'Find the clothes for me'}
+          </Button>
+        ) : null}
+
         <div className="mb-2.5 flex gap-1.5 rounded-full bg-[var(--surface-alt)] p-1">
           {SHAPES.map((option) => (
             <button
