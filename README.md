@@ -745,6 +745,13 @@ and long sleeves on her in a heatwave" rather than as a unit test, because that
 is how they were found: not by a rule failing in isolation, but by reading ten
 outfits and wincing.
 
+- **Colour nuance was outvoting garment sense.** The harmony bonus ranged from
+  about −20 to +13 — wider than a whole step of formality — so a pair of fleece
+  joggers beat a pair of jeans for an ordinary day out because grey sits against
+  navy with more contrast than black does. Whether a garment suits where you are
+  going is a fact about the occasion; whether two hexes get on is a tie-breaker,
+  and it is clamped to one now.
+
 **A test was protecting the worst of them.** `prefers the less-worn of two
 equivalent pieces` asserted the inversion as if it were the feature.
 

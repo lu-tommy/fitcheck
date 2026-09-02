@@ -168,13 +168,15 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
    * to the clash penalty, and absurd. Somebody who has not said where they are
    * going is going about their day.
    *
-   * The pull is gentler when it was inferred than when it was asked for: a
-   * blazer on a Tuesday is a choice somebody might make, and the app should
-   * lean rather than forbid.
+   * The pull is the same strength either way. It was gentler for the inferred
+   * case at first, on the reasoning that a blazer on a Tuesday is a choice
+   * somebody might make — but half a step of slack was enough to put fleece
+   * joggers under a pair of suede boots for an ordinary day out, and "I did not
+   * say where I am going" much more often means going out than staying in.
    */
   const target = request.formality ?? 'casual';
   const distance = Math.abs(formalityScore(item.formality) - formalityScore(target));
-  score += Math.max(-24, 12 - distance * (request.formality ? 8 : 6));
+  score += Math.max(-24, 12 - distance * 8);
 
   // Style match.
   const wantedStyle = request.style ? [request.style] : (context.preferredStyles ?? []);
@@ -311,14 +313,24 @@ function bestBySlot(candidates: ScoredItem[], slot: Slot): ScoredItem | undefine
     .sort((a, b) => b.score - a.score)[0];
 }
 
-/** Bonus for a candidate that harmonises with what has already been chosen. */
+/**
+ * Bonus for a candidate that harmonises with what has already been chosen.
+ *
+ * Clamped, because colour is a tie-breaker between comparable garments and not
+ * a reason to choose one garment over another. Unclamped it ranged from about
+ * -20 to +13 — wider than a whole step of formality — and it was deciding
+ * slots: grey sits against navy with more contrast than black does, so a pair
+ * of fleece joggers beat a pair of jeans for an ordinary day out on the
+ * strength of a lightness spread. The garment being right for where somebody is
+ * going is a fact about the occasion; this is a nuance about two hexes.
+ */
 function harmonyBonus(candidate: ClothingItem, chosen: ClothingItem[]): number {
   if (chosen.length === 0) return 0;
   const hexes = [...chosen, candidate].map(
     (item) => item.primaryColorHex || hexForColorName(item.primaryColor),
   );
   const report = analyzeHarmony(hexes);
-  return (report.score - 60) / 3;
+  return Math.max(-4, Math.min(4, (report.score - 60) / 5));
 }
 
 /**
@@ -540,9 +552,22 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
    * this is: somebody in joggers is not at a wedding whatever they typed.
    */
   const register = chosen.filter((item) => REGISTER_SLOTS.includes(slotOf(item.category)));
-  const dressiness = register.length
-    ? Math.min(...register.map((item) => formalityScore(item.formality)))
-    : formalityScore(request.formality ?? 'casual');
+  /*
+   * What was ASKED for, where anything was, and otherwise the dressiest thing
+   * on the body.
+   *
+   * Reading it off the least dressy garment turned out to be too harsh: one
+   * pair of joggers in an otherwise ordinary outfit capped the whole thing at a
+   * single focal point, so a favourite gold chain never came out. What somebody
+   * typed is the better statement of what this is — "the gym" caps it whatever
+   * they are wearing — and with nothing typed, the dressiest piece is the one
+   * saying what the outfit is aiming at.
+   */
+  const dressiness = request.formality
+    ? formalityScore(request.formality)
+    : register.length
+      ? Math.max(...register.map((item) => formalityScore(item.formality)))
+      : 1;
   // Only the very-casual end is capped. Casual daywear genuinely carries three
   // focal points — sunglasses, a chain, a watch and a belt is what a great many
   // people wear to do the shopping — and the problem this fixes was the gym.
