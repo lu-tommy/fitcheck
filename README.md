@@ -491,6 +491,31 @@ around this piece than it fires everywhere else** — which for a pair of tuxedo
 trousers in a casual wardrobe is *"usually because it is dressier or plainer
 than what it goes with"*, and that is a sentence somebody can do something with.
 
+## One piece, ten ways
+
+The app is a very good ten seconds in the morning and, on its own, a thin reason
+to open at any other time. The format that answers that is not a prettier home
+screen: it is the one styling idea that reliably outperforms a fit check —
+take something somebody already owns and show them ten outfits they did not know
+were in the wardrobe. Every app could build it; only one built on a photographed
+closet can build it **from your own clothes**, which is the only version worth
+looking at twice.
+
+The difficulty is that ten builds of a deterministic engine give ten of the same
+outfit. Two things pull them apart, both already in the engine:
+
+- **Ask ten different questions.** A jumper for a cold Tuesday and a jumper for
+  dinner are genuinely different outfits, so the contexts vary the occasion and
+  the weather rather than a random seed.
+- **Remember what has been used.** Everything worn in an earlier look is put to
+  rest for the later ones — a penalty rather than a ban, so a wardrobe of
+  fifteen pieces still yields ten looks instead of running dry at four.
+
+Tapping a look saves it, so the screen is a way into the wardrobe rather than a
+poster of it, and **Share** renders the grid as one picture. The button only
+appears where there is something to show: four looks is a feature and two is an
+apology, so the count is taken before the button rather than after it is pressed.
+
 ## Care instructions
 
 Each item can carry its label — wash, cycle, dry, iron, bleach, plus the short

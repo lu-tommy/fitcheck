@@ -371,3 +371,86 @@ export async function shareImage(
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return 'downloaded';
 }
+
+/**
+ * One garment, several ways, as a single picture.
+ *
+ * The format that reliably outperforms a plain fit check is the one that
+ * teaches something — take a thing somebody owns and show what else is in the
+ * wardrobe around it. Every cell here is a real outfit out of a real closet,
+ * which is the half no mood board can copy.
+ *
+ * Laid out as a grid rather than a strip because the whole claim is *look how
+ * many*: a column somebody scrolls makes the same point far more weakly than
+ * six of them at once.
+ */
+export async function renderWaysImage(
+  hero: string,
+  ways: { items: ClothingItem[]; label: string }[],
+  options: { theme?: RenderTheme } = {},
+): Promise<Blob> {
+  const theme = options.theme ?? LIGHT_THEME;
+  const { element, context } = canvas(WIDTH, HEIGHT);
+
+  context.fillStyle = theme.background;
+  context.fillRect(0, 0, WIDTH, HEIGHT);
+
+  // Six is what fits at a size where the garments are still legible. More cells
+  // would be a smaller claim, not a bigger one.
+  const shown = ways.slice(0, 6);
+  const columns = shown.length <= 4 ? 2 : 3;
+  const rows = Math.ceil(shown.length / columns);
+
+  context.textAlign = 'left';
+  context.fillStyle = theme.ink;
+  context.font = `700 60px ${FONT}`;
+  context.fillText(`${shown.length} ways`, 72, 104, WIDTH - 144);
+  context.fillStyle = theme.muted;
+  context.font = `400 34px ${FONT}`;
+  context.fillText(`to wear my ${hero.toLowerCase()}`, 72, 152, WIDTH - 144);
+
+  const top = 208;
+  const bottom = HEIGHT - 120;
+  const gap = 24;
+  const cellWidth = (WIDTH - 144 - gap * (columns - 1)) / columns;
+  const cellHeight = (bottom - top - gap * rows) / rows;
+
+  const opened: ImageBitmap[] = [];
+  for (let i = 0; i < shown.length; i += 1) {
+    const column = i % columns;
+    const row = Math.floor(i / columns);
+    const x = 72 + column * (cellWidth + gap);
+    const y = top + row * (cellHeight + gap);
+
+    roundedPath(context, x, y, cellWidth, cellHeight, 22);
+    context.fillStyle = theme.panel;
+    context.fill();
+
+    context.save();
+    roundedPath(context, x, y, cellWidth, cellHeight, 22);
+    context.clip();
+    opened.push(
+      ...(await drawCollage(
+        context,
+        shown[i].items,
+        undefined,
+        { x, y, width: cellWidth, height: cellHeight - 46 },
+        theme,
+      )),
+    );
+    context.restore();
+
+    context.fillStyle = theme.muted;
+    context.font = `600 26px ${FONT}`;
+    context.textAlign = 'center';
+    context.fillText(shown[i].label, x + cellWidth / 2, y + cellHeight - 16, cellWidth - 24);
+  }
+
+  context.fillStyle = theme.muted;
+  context.font = `500 28px ${FONT}`;
+  context.textAlign = 'center';
+  context.fillText('All from my own wardrobe · FitCheck', WIDTH / 2, HEIGHT - 54);
+
+  opened.forEach((bitmap) => bitmap.close());
+  return toBlob(element);
+}

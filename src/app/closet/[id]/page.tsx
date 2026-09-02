@@ -1,6 +1,15 @@
 'use client';
 
-import { Archive, ArchiveRestore, Droplets, Heart, PenLine, Sparkles, Trash2 } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  Droplets,
+  Heart,
+  LayoutGrid,
+  PenLine,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { use, useMemo, useState } from 'react';
 
@@ -22,6 +31,7 @@ import {
 } from '@/domain/care';
 import { hexForColorName, suggestPairings } from '@/domain/color';
 import { availableBrands } from '@/domain/filters';
+import { MIN_WAYS, tenWays } from '@/domain/tenWays';
 import {
   FORMALITY_LABEL,
   PATTERN_LABEL,
@@ -52,6 +62,16 @@ export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
   const pairings = useMemo(
     () => (item ? suggestPairings(item.primaryColorHex, item.primaryColor) : []),
     [item],
+  );
+
+  /*
+   * Counted here so the button can say the number, and so it can be left off
+   * entirely where there is nothing to show. Cheap: the engine runs on the
+   * wardrobe already in memory.
+   */
+  const waysAvailable = useMemo(
+    () => (item && !item.archived ? tenWays(item, items).length : 0),
+    [item, items],
   );
 
   if (!hydrated) {
@@ -336,6 +356,23 @@ export default function ItemDetailPage({ params }: PageProps<'/closet/[id]'>) {
             Style this
           </Button>
         </div>
+
+        {/*
+          * Offered only where there is something to show. Four looks is a
+          * feature and two is an apology, so the check happens before the
+          * button rather than after it is pressed — nothing here opens onto a
+          * shrug.
+          */}
+        {waysAvailable >= MIN_WAYS ? (
+          <Button
+            variant="secondary"
+            full
+            icon={<LayoutGrid size={16} />}
+            onClick={() => router.push(`/closet/${item.id}/ways`)}
+          >
+            {waysAvailable} ways to wear it
+          </Button>
+        ) : null}
 
         {item.archived ? (
           <div className="card space-y-3 p-4">
