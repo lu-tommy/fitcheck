@@ -139,6 +139,7 @@ export default function HomePage() {
       units: preferences.units,
       restingItemIds: seen,
       affinity: taste.affinity,
+      today,
     });
   }, [
     items,
@@ -177,6 +178,7 @@ export default function HomePage() {
       avoidColors: preferences.avoidColors,
       units: preferences.units,
       affinity: taste.affinity,
+      today,
     }),
     [
       items,

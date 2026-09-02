@@ -260,7 +260,11 @@ describe('list', () => {
  * warm yellow and silver is a light grey.
  */
 describe('metals', () => {
-  const jewellery = (id: string, category: 'ring' | 'necklace' | 'watch' | 'earrings', metal?: 'gold' | 'silver' | 'mixed') =>
+  const jewellery = (
+    id: string,
+    category: 'ring' | 'necklace' | 'watch' | 'earrings' | 'bracelet',
+    metal?: 'gold' | 'silver' | 'mixed',
+  ) =>
     makeItem({ id, category, name: `${metal ?? 'unknown'} ${category}`, metal });
 
   it('says nothing about a single piece', () => {
@@ -284,7 +288,7 @@ describe('metals', () => {
       ...plain(),
       jewellery('a', 'ring', 'gold'),
       jewellery('b', 'necklace', 'gold'),
-      jewellery('c', 'watch', 'silver'),
+      jewellery('c', 'earrings', 'silver'),
     ]);
     const note = report.deductions.find((entry) => entry.rule === 'metals');
     expect(note).toBeDefined();
@@ -296,11 +300,30 @@ describe('metals', () => {
     const report = scoreOutfit([
       ...plain(),
       jewellery('a', 'ring', 'gold'),
-      jewellery('b', 'necklace', 'gold'),
-      jewellery('c', 'watch', 'silver'),
+      jewellery('b', 'bracelet', 'gold'),
+      jewellery('c', 'necklace', 'silver'),
       jewellery('d', 'earrings', 'silver'),
     ]);
     expect(ruleOf(report.credits)).toContain('metals');
+  });
+
+  /*
+   * A watch is a functional object somebody owns one of, not a piece chosen to
+   * go with an outfit — and a steel watch worn with gold rings is what a very
+   * large number of people wear every day. Counting it fired a deduction on
+   * nearly every otherwise good outfit in a real forty-piece wardrobe, and a
+   * rule that cries wolf on the ordinary case teaches people to stop reading
+   * the card.
+   */
+  it('does not count a watch against the jewellery', () => {
+    const report = scoreOutfit([
+      ...plain(),
+      jewellery('a', 'ring', 'gold'),
+      jewellery('b', 'necklace', 'gold'),
+      makeItem({ id: 'c', category: 'watch', name: 'Steel watch', metal: 'silver' }),
+    ]);
+    expect(ruleOf(report.deductions)).not.toContain('metals');
+    expect(ruleOf(report.unjudged)).not.toContain('metals');
   });
 
   /*
@@ -312,7 +335,7 @@ describe('metals', () => {
       ...plain(),
       jewellery('a', 'ring', 'gold'),
       jewellery('b', 'necklace', 'gold'),
-      jewellery('c', 'watch', 'mixed'),
+      jewellery('c', 'earrings', 'mixed'),
     ]);
     expect(ruleOf(report.deductions)).not.toContain('metals');
   });

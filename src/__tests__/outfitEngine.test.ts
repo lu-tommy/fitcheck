@@ -125,16 +125,99 @@ describe('buildOutfitLocally', () => {
     expect(outfit.itemIds).toEqual([]);
   });
 
-  it('prefers the less-worn of two equivalent pieces', () => {
+  /*
+   * This test used to assert the opposite, and it was protecting a bug.
+   *
+   * Wear count was a straight penalty capped at twelve, so a white tee worn
+   * forty-two times and marked a favourite scored -12 +8 = -4 while a purple
+   * satin shirt bought once and regretted scored -0.6. The regretted shirt
+   * started three and a half points ahead — more than the seasonality bonus,
+   * and enough to decide almost every slot. Run over a real forty-piece
+   * wardrobe, that one shirt appeared in seven outfits out of ten.
+   *
+   * An app whose entire promise is "wear what you own" was systematically
+   * dressing somebody in the things they had proved they do not wear.
+   */
+  it('prefers the piece she actually wears, not the one she never does', () => {
     const closet = [
-      makeItem({ id: 'worn', category: 'tshirt', wearCount: 40 }),
-      makeItem({ id: 'fresh', category: 'tshirt', wearCount: 0 }),
+      makeItem({ id: 'loved', category: 'tshirt', wearCount: 40 }),
+      makeItem({ id: 'regretted', category: 'tshirt', wearCount: 0 }),
       makeItem({ id: 'jeans', category: 'jeans' }),
       makeItem({ id: 'sneakers', category: 'sneakers' }),
     ];
     const outfit = buildOutfitLocally({ request: emptyRequest, closet, weather: weather(20) });
-    expect(outfit.itemIds).toContain('fresh');
-    expect(outfit.itemIds).not.toContain('worn');
+    expect(outfit.itemIds).toContain('loved');
+    expect(outfit.itemIds).not.toContain('regretted');
+  });
+
+  /*
+   * Variety comes from WHEN it was last on, which is a different fact and the
+   * one that was missing. Yesterday's shirt is the one thing somebody does not
+   * want offered again this morning, and that has nothing to do with whether
+   * they like it.
+   */
+  it('rests what was worn yesterday, however much it is loved', () => {
+    const closet = [
+      makeItem({
+        id: 'yesterday',
+        category: 'tshirt',
+        wearCount: 40,
+        favorite: true,
+        lastWornAt: '2026-05-31T18:00:00.000Z',
+      }),
+      makeItem({ id: 'other', category: 'tshirt', wearCount: 12 }),
+      makeItem({ id: 'jeans', category: 'jeans' }),
+      makeItem({ id: 'sneakers', category: 'sneakers' }),
+    ];
+    const outfit = buildOutfitLocally({
+      request: emptyRequest,
+      closet,
+      weather: weather(20),
+      today: '2026-06-01',
+    });
+    expect(outfit.itemIds).toContain('other');
+    expect(outfit.itemIds).not.toContain('yesterday');
+  });
+
+  it('offers it again once it has had a week off', () => {
+    const closet = [
+      makeItem({
+        id: 'loved',
+        category: 'tshirt',
+        wearCount: 40,
+        favorite: true,
+        lastWornAt: '2026-05-01T18:00:00.000Z',
+      }),
+      makeItem({ id: 'other', category: 'tshirt', wearCount: 12 }),
+      makeItem({ id: 'jeans', category: 'jeans' }),
+      makeItem({ id: 'sneakers', category: 'sneakers' }),
+    ];
+    const outfit = buildOutfitLocally({
+      request: emptyRequest,
+      closet,
+      weather: weather(20),
+      today: '2026-06-01',
+    });
+    expect(outfit.itemIds).toContain('loved');
+  });
+
+  /*
+   * A wardrobe with one shirt still has to produce a shirt. The penalty is
+   * large enough to lose a slot to any fresh alternative and no larger.
+   */
+  it('still wears the only shirt she owns, even if it was on yesterday', () => {
+    const closet = [
+      makeItem({ id: 'only', category: 'tshirt', lastWornAt: '2026-05-31T18:00:00.000Z' }),
+      makeItem({ id: 'jeans', category: 'jeans' }),
+      makeItem({ id: 'sneakers', category: 'sneakers' }),
+    ];
+    const outfit = buildOutfitLocally({
+      request: emptyRequest,
+      closet,
+      weather: weather(20),
+      today: '2026-06-01',
+    });
+    expect(outfit.itemIds).toContain('only');
   });
 
   // Three focal points, not three objects — see ACCESSORY_FOCAL_WEIGHT, and

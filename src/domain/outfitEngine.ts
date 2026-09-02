@@ -1,6 +1,7 @@
 import type {
   Category,
   ClothingItem,
+  Metal,
   GeneratedOutfit,
   OutfitRequest,
   Season,
@@ -62,6 +63,13 @@ export interface EngineContext {
    * few taps.
    */
   affinity?: Map<string, number>;
+  /**
+   * Today, as YYYY-MM-DD, for judging how recently a piece was worn.
+   *
+   * Passed in rather than read from the clock so the engine stays pure and a
+   * test can sit on any date it likes. Absent, nothing is treated as recent.
+   */
+  today?: string;
   /** Garments that suit the occasion, read from what the wearer typed. */
   preferCategories?: Category[];
   /**
@@ -85,7 +93,14 @@ interface ScoredItem {
  * classic wardrobe-app mistake of layering wool over shorts.
  */
 function targetWarmth(temperatureC: number): number {
-  if (temperatureC >= 24) return 0;
+  /*
+   * Nothing is needed above twenty. This used to be twenty-four, which is fine
+   * for separates — a shirt and trousers already carry two — and wrong for
+   * anything light: a dress and a pair of shoes carry nothing at all, so the
+   * arithmetic said a twenty-degree wedding was a point short and a chunky
+   * oatmeal jumper went on over a black silk wrap dress.
+   */
+  if (temperatureC >= 20) return 0;
   if (temperatureC >= 17) return 1;
   if (temperatureC >= 12) return 2;
   if (temperatureC >= 7) return 4;
@@ -112,20 +127,54 @@ function layerWouldClash(
   });
 }
 
+/**
+ * The least an accessory can score and still be worth putting on.
+ *
+ * Every garment starts at fifty, so this is "mildly wrong for the occasion or
+ * the weather, and no worse". Below it the piece is being worn because there
+ * was room rather than because it belongs.
+ */
+const ACCESSORY_FLOOR = 45;
+
 function scoreItem(item: ClothingItem, context: EngineContext, temperature: number): number {
   const { request } = context;
   let score = 50;
 
-  // Seasonality.
-  const season = context.season ?? currentSeason();
+  /*
+   * Seasonality — but the thermometer outranks the calendar at the extremes.
+   *
+   * The season came from the clock and moved the score by ten points, which is
+   * nothing next to the rest of the scorer. On a thirty-one degree day in
+   * September that produced a long-sleeved top and fleece joggers, because both
+   * are autumn garments and autumn is what the calendar said. Nobody has ever
+   * dressed for the month over the weather.
+   *
+   * In the mild middle the calendar genuinely knows better — sixteen degrees in
+   * March and sixteen in October ask for different things — so it only takes
+   * over when the temperature has stopped being ambiguous.
+   */
+  const decisive = decisiveSeason(temperature);
+  const season = decisive ?? context.season ?? currentSeason();
   if (item.seasons.includes(season)) score += 10;
-  else if (item.seasons.length > 0) score -= 8;
+  else if (item.seasons.length > 0) score -= decisive ? 30 : 8;
 
-  // Formality proximity — one step away is fine, three steps is not.
-  if (request.formality) {
-    const distance = Math.abs(formalityScore(item.formality) - formalityScore(request.formality));
-    score += Math.max(-24, 12 - distance * 8);
-  }
+  /*
+   * Formality proximity — one step away is fine, three steps is not.
+   *
+   * There is a default now, and it matters more than it looks. With no occasion
+   * stated this term was skipped ENTIRELY, so nothing anywhere preferred
+   * everyday clothes to formal ones — and the outfit for an ordinary Tuesday
+   * came back as dress trousers and heeled pumps. Internally consistent, thanks
+   * to the clash penalty, and absurd. Somebody who has not said where they are
+   * going is going about their day.
+   *
+   * The pull is gentler when it was inferred than when it was asked for: a
+   * blazer on a Tuesday is a choice somebody might make, and the app should
+   * lean rather than forbid.
+   */
+  const target = request.formality ?? 'casual';
+  const distance = Math.abs(formalityScore(item.formality) - formalityScore(target));
+  score += Math.max(-24, 12 - distance * (request.formality ? 8 : 6));
 
   // Style match.
   const wantedStyle = request.style ? [request.style] : (context.preferredStyles ?? []);
@@ -135,8 +184,40 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
 
   // Warmth suitability for the individual piece.
   const warmth = categoryMeta(item.category).warmth;
+  const slot = slotOf(item.category);
   if (temperature >= 24 && warmth >= 2) score -= 25;
-  if (temperature <= 6 && warmth === 0 && slotOf(item.category) !== 'accessory') score -= 8;
+  // Fleece joggers are not a two-warmth garment and were sailing through.
+  if (temperature >= 27 && warmth >= 1) score -= 22;
+  if (temperature <= 6 && warmth === 0 && slot !== 'accessory') score -= 8;
+
+  /*
+   * A wool scarf is not a mild preference in June.
+   *
+   * Accessories were exempt from the warm-weather rule and only judged above
+   * 24°C, so a burgundy wool scarf came out for a nineteen-degree trip to the
+   * gym. It is the one accessory nobody wears for the look alone.
+   */
+  if (slot === 'accessory' && warmth >= 2 && temperature >= 15) score -= 40;
+
+  /*
+   * Sunglasses are worn for the sun, and the engine had no idea.
+   *
+   * They were offered for dinner at fourteen degrees in the evening — which is
+   * the sort of detail that makes somebody stop trusting the whole screen, the
+   * way one wrong word in a paragraph does.
+   */
+  if (item.category === 'sunglasses' && temperature < 18) score -= 60;
+
+  /*
+   * Shoes are where the weather is felt first, and the old rule barely noticed.
+   * Heeled pumps came out at minus two degrees, and sandals were one bad day
+   * away from doing the same.
+   */
+  if (slot === 'footwear') {
+    if (temperature <= 4 && warmth === 0) score -= 45;
+    if (temperature <= 12 && item.category === 'sandals') score -= 120;
+    if (temperature >= 26 && warmth >= 2) score -= 45;
+  }
 
   // Colour preferences.
   const colorText = [item.primaryColor, ...item.secondaryColors].join(' ').toLowerCase();
@@ -150,9 +231,27 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
   const affinity = context.affinity?.get(item.id);
   if (affinity) score += affinity * AFFINITY_WEIGHT;
 
-  // Nudge towards favourites and away from the same three pieces every day.
+  // Nudge towards favourites.
   if (item.favorite) score += 8;
-  score -= Math.min(12, item.wearCount * 0.6);
+
+  /*
+   * How much a garment has been worn used to be a straight PENALTY, capped at
+   * twelve, and it quietly inverted the whole wardrobe. A white tee worn
+   * forty-two times and marked a favourite scored -12 +8 = -4; a purple satin
+   * shirt bought once and regretted scored -0.6. The regretted shirt started
+   * three and a half points ahead of the favourite, which is more than the
+   * seasonality bonus and enough to decide almost every slot — so the app
+   * systematically dressed somebody in the clothes they had proved they do not
+   * wear. On a real forty-piece wardrobe that one shirt appeared in seven of
+   * ten outfits.
+   *
+   * Wear count is EVIDENCE, not a debt. It says the garment works. What stops
+   * the same three pieces every day is not pretending the favourites are worn
+   * out — it is remembering when they were last on, which is a different fact
+   * and the one that was missing.
+   */
+  score += Math.min(4, Math.log1p(Math.max(0, item.wearCount)) * 1.1);
+  score -= recencyPenalty(item, context.today);
 
   // Laundry.
   if (item.laundry === 'dirty') score -= request.cleanOnly ? 1000 : 40;
@@ -169,6 +268,41 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
   if (request.excludeItemIds.includes(item.id)) score -= 1000;
 
   return score;
+}
+
+/**
+ * How recently it was on, which is the honest way to get variety.
+ *
+ * Yesterday's shirt is the one thing somebody genuinely does not want offered
+ * again this morning, and it has nothing to do with whether they like it. Big
+ * enough to lose a slot to any fresh alternative, small enough that a wardrobe
+ * with one jumper still gets the jumper.
+ */
+/**
+ * The season the weather is actually insisting on, or null while it is mild.
+ *
+ * Deliberately narrow. Between about seven and twenty-four degrees the month is
+ * the better guide — a mild March day and a mild October day want different
+ * clothes and the thermometer cannot tell them apart.
+ */
+function decisiveSeason(temperature: number): Season | null {
+  if (temperature >= 25) return 'summer';
+  if (temperature <= 6) return 'winter';
+  return null;
+}
+
+function recencyPenalty(item: ClothingItem, today?: string): number {
+  if (!today || !item.lastWornAt) return 0;
+  const worn = Date.parse(item.lastWornAt);
+  const now = Date.parse(`${today}T12:00:00`);
+  if (Number.isNaN(worn) || Number.isNaN(now)) return 0;
+
+  const days = Math.floor((now - worn) / 86_400_000);
+  if (days < 0) return 0;
+  if (days <= 1) return 45;
+  if (days <= 3) return 18;
+  if (days <= 7) return 6;
+  return 0;
 }
 
 function bestBySlot(candidates: ScoredItem[], slot: Slot): ScoredItem | undefined {
@@ -227,6 +361,24 @@ export function formalityClashPenalty(
   return cost === 0 ? 0 : -cost;
 }
 
+/** Every option for a slot, best first — the ranked list pickForSlot tops. */
+function slotAlternativesFor(
+  slot: Slot,
+  candidates: ScoredItem[],
+  chosen: ClothingItem[],
+  used: Set<string>,
+): ClothingItem[] {
+  return candidates
+    .filter((entry) => slotOf(entry.item.category) === slot && !used.has(entry.item.id))
+    .map((entry) => ({
+      ...entry,
+      score:
+        entry.score + harmonyBonus(entry.item, chosen) + formalityClashPenalty(entry.item, chosen),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.item);
+}
+
 function pickForSlot(
   slot: Slot,
   candidates: ScoredItem[],
@@ -271,9 +423,24 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
   const forcedFullbody = forced.find((item) => slotOf(item.category) === 'fullbody');
   const bestFullbody = bestBySlot(scored, 'fullbody');
   const bestTop = bestBySlot(scored, 'top');
+  /*
+   * A dress replaces a top AND a bottom, so it is compared against both.
+   *
+   * It used to have to beat the best top by fifteen points on its own, which is
+   * a hurdle nothing clears: a formal dress lost a wedding to an Oxford shirt
+   * by five and a half. Comparing like with like — one garment against the pair
+   * it stands in for — is both fairer and the actual question, and it needs no
+   * margin on top: any margin is a thumb on the scale against dresses, and the
+   * formality term already keeps one off an ordinary Tuesday.
+   */
+  const bestBottom = bestBySlot(scored, 'bottom');
+  const separates =
+    bestTop && bestBottom
+      ? (bestTop.score + bestBottom.score) / 2
+      : (bestTop?.score ?? bestBottom?.score ?? -Infinity);
   const useFullbody =
     Boolean(forcedFullbody) ||
-    (bestFullbody != null && (bestTop == null || bestFullbody.score > bestTop.score + 15));
+    (bestFullbody != null && (bestTop == null || bestFullbody.score > separates));
 
   forced.forEach(take);
 
@@ -297,18 +464,38 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
     items.reduce((total, item) => total + categoryMeta(item.category).warmth, 0);
   const needed = targetWarmth(temperature);
 
+  /**
+   * Add a layer, working down the options rather than taking one or giving up.
+   *
+   * It used to consider only the best candidate and abandon the slot if that
+   * one was unsuitable — so a rule that turned down a wool coat sent somebody
+   * out at minus two degrees with no coat at all, which is very much worse than
+   * whatever the rule was protecting them from. Skipping a candidate has to
+   * mean trying the next one.
+   */
   const takeLayer = (slot: Slot) => {
-    const candidate = pickForSlot(slot, scored, chosen, used);
-    if (!candidate) return;
-    if (layerWouldClash(candidate, chosen, temperature)) return;
-    /*
-     * A layer is optional, so it must never be the reason a wrong garment gets
-     * worn. Top, bottom and shoes fall back to whatever exists — better the
-     * wrong shoes than none — but nobody needs a blazer to go running, and
-     * being a degree cold beats being dressed for the wrong thing entirely.
-     */
-    if (context.avoidCategories?.includes(candidate.category)) return;
-    take(candidate);
+    const options = slotAlternativesFor(slot, scored, chosen, used);
+
+    for (const candidate of options) {
+      if (layerWouldClash(candidate, chosen, temperature)) continue;
+      /*
+       * A layer is optional, so it must never be the reason a wrong garment
+       * gets worn. Top, bottom and shoes fall back to whatever exists — better
+       * the wrong shoes than none — but nobody needs a blazer to go running.
+       */
+      if (context.avoidCategories?.includes(candidate.category)) continue;
+
+      /*
+       * And do not reach for a jumper to close a one-point gap in mild weather.
+       * Above sixteen degrees a layer has to be roughly the size of the
+       * shortfall, or it is not the answer to it.
+       */
+      const gap = needed - warmthOf(chosen);
+      if (temperature >= 17 && categoryMeta(candidate.category).warmth > gap) continue;
+
+      take(candidate);
+      return;
+    }
   };
 
   if (warmthOf(chosen) < needed && !chosen.some((item) => slotOf(item.category) === 'midlayer')) {
@@ -340,24 +527,78 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
   // rather than folded into the position table, which would then be lying.
   if (chosen.some((item) => slotOf(item.category) === 'headwear')) takenPositions.add('head');
 
+  /*
+   * How much jewellery the occasion can carry.
+   *
+   * Three focal points is the rule for an outfit somebody is dressing FOR. It
+   * is not the rule for the gym, and the budget did not know the difference —
+   * so a trip to the gym came back with a wool scarf, gold hoops, a signet ring
+   * and a leather belt. Nobody accessorises to run.
+   *
+   * Read off what is already on the body rather than off the request, because
+   * the register of the actual clothes is the more reliable statement of what
+   * this is: somebody in joggers is not at a wedding whatever they typed.
+   */
+  const register = chosen.filter((item) => REGISTER_SLOTS.includes(slotOf(item.category)));
+  const dressiness = register.length
+    ? Math.min(...register.map((item) => formalityScore(item.formality)))
+    : formalityScore(request.formality ?? 'casual');
+  // Only the very-casual end is capped. Casual daywear genuinely carries three
+  // focal points — sunglasses, a chain, a watch and a belt is what a great many
+  // people wear to do the shopping — and the problem this fixes was the gym.
+  const budget = dressiness <= 0 ? 1 : ACCESSORY_FOCAL_BUDGET;
+
   let focal = chosen
     .filter((item) => slotOf(item.category) === 'accessory')
     .reduce((total, item) => total + accessoryFocalWeight(item.category), 0);
 
-  scored
-    .filter((entry) => slotOf(entry.item.category) === 'accessory' && !used.has(entry.item.id))
-    .sort((a, b) => b.score - a.score)
-    .forEach((entry) => {
-      const position = accessoryPosition(entry.item.category);
-      if (takenPositions.has(position)) return;
-      // Skipping one that will not fit leaves the budget open for a quieter
-      // piece further down, which is how a belt survives a statement necklace.
-      const weight = accessoryFocalWeight(entry.item.category);
-      if (focal + weight > ACCESSORY_FOCAL_BUDGET) return;
-      takenPositions.add(position);
-      focal += weight;
-      take(entry.item);
-    });
+  /*
+   * Picked one at a time rather than in one sorted pass, so that each choice
+   * can see the ones before it.
+   *
+   * The scorer marks an outfit down for wearing one gold thing and one silver
+   * thing, and the builder had no idea — so it assembled exactly that
+   * combination and then the card explained why it was wrong. An engine and a
+   * critic that disagree is worse than either alone: it reads as the app
+   * arguing with itself.
+   */
+  const remaining = scored.filter(
+    (entry) => slotOf(entry.item.category) === 'accessory' && !used.has(entry.item.id),
+  );
+
+  for (;;) {
+    const metalsOn = new Set(
+      chosen.map((item) => item.metal).filter((metal): metal is Metal => Boolean(metal)),
+    );
+
+    const next = remaining
+      .filter((entry) => !used.has(entry.item.id))
+      .filter((entry) => !takenPositions.has(accessoryPosition(entry.item.category)))
+      .filter((entry) => focal + accessoryFocalWeight(entry.item.category) <= budget)
+      /*
+       * An accessory has to be worth wearing, not merely affordable.
+       *
+       * The loop took the best remaining thing that fit the budget, which is
+       * not the same test — so a pair of sunglasses carrying a sixty-point
+       * penalty for a fourteen-degree evening was still the best thing left for
+       * the eyes, and went to dinner. A budget is a ceiling, never a quota.
+       */
+      .filter((entry) => entry.score >= ACCESSORY_FLOOR)
+      .map((entry) => ({
+        entry,
+        // Matching what is already on wins ties and a little more; it never
+        // outweighs the piece being right for the occasion.
+        score:
+          entry.score +
+          (entry.item.metal && metalsOn.size > 0 && metalsOn.has(entry.item.metal) ? 14 : 0),
+      }))
+      .sort((a, b) => b.score - a.score)[0];
+
+    if (!next) break;
+    takenPositions.add(accessoryPosition(next.entry.item.category));
+    focal += accessoryFocalWeight(next.entry.item.category);
+    take(next.entry.item);
+  }
 
   const harmony = analyzeHarmony(
     chosen.map((item) => item.primaryColorHex || hexForColorName(item.primaryColor)),

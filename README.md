@@ -699,6 +699,55 @@ brooch on a lapel, a scarf worn in the hair.
   since spring, the jeans out four times this fortnight. All of it from records
   already kept, which is what makes logging an outfit worth the tap.
 
+## Reading the outfits out loud
+
+Every unit test here builds the smallest closet that proves one rule. That is
+the right way to test a rule and no way at all to answer the question somebody
+actually has in front of a mirror: *does this dress me like a person, or like a
+spreadsheet?*
+
+`wardrobeAudit.test.ts` runs the real engine over a real forty-two piece
+wardrobe across ten scenarios and prints what comes out. Run
+`npx vitest run wardrobeAudit --reporter=verbose` and read it.
+
+The first time it was run it produced a clown show, and every one of these was
+a rule that passed its own unit test:
+
+- **It preferred the clothes she never wears.** Wear count was a straight
+  penalty capped at twelve, so a white tee worn forty-two times and marked a
+  favourite scored −12 +8 = −4 while a purple satin shirt bought once and
+  regretted scored −0.6. The regretted shirt started three and a half points
+  ahead — more than the seasonality bonus — and appeared in **seven of ten
+  outfits**. Wear count is evidence, not a debt; variety now comes from when a
+  piece was last on, which is a different fact and the one that was missing.
+- **It dressed for the month, not the weather.** Thirty-one degrees in
+  September produced a long-sleeved top and fleece joggers, because both are
+  autumn garments. The thermometer outranks the calendar at the extremes now,
+  and only there — a mild March day and a mild October day genuinely want
+  different things.
+- **Heeled pumps at minus two, and no coat.** Footwear barely felt the weather.
+- **A wool scarf, gold hoops, a signet ring and a belt — to the gym.** The
+  accessory budget had no idea what the outfit was for.
+- **Sunglasses to dinner on a fourteen-degree evening**, because the accessory
+  loop took the best thing that *fit the budget* rather than the best thing
+  that was any good. A budget is a ceiling, never a quota.
+- **A formal dress lost a wedding to an Oxford shirt**, because a dress had to
+  beat the best top by fifteen points alone — a hurdle nothing clears. It stands
+  in for a top *and* a bottom, so it is compared against both.
+- **A chunky oatmeal jumper over a black silk wrap dress**, because a dress and
+  a pair of shoes carry no warmth and the arithmetic said the outfit was one
+  point short at twenty degrees.
+- **The engine built outfits its own score then marked down** — one gold thing
+  and one silver thing — which reads as the app arguing with itself.
+
+Every one is now a named scenario in that file, written as "does not put fleece
+and long sleeves on her in a heatwave" rather than as a unit test, because that
+is how they were found: not by a rule failing in isolation, but by reading ten
+outfits and wincing.
+
+**A test was protecting the worst of them.** `prefers the less-worn of two
+equivalent pieces` asserted the inversion as if it were the feature.
+
 ## Testing
 
 `npm test` covers the domain layer — the outfit engine's slot rules and

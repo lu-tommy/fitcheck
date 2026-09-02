@@ -27,6 +27,7 @@ import {
   slotOf,
 } from '@/domain/taxonomy';
 import { renderComparisonImage, shareImage } from '@/lib/outfitImage';
+import { todayKey } from '@/lib/date';
 import { COLOR_NAMES, swatches } from '@/lib/palette';
 import { formatTemperatureLong, titleCase } from '@/lib/format';
 import { useActiveItems, useCloset, useResolvedItems } from '@/store/closet';
@@ -136,6 +137,7 @@ function Generator() {
       preferredStyles: style ? [style] : (intent?.styles ?? preferences.preferredStyles),
       avoidColors: preferences.avoidColors,
       units: preferences.units,
+      today: todayKey(),
       restingItemIds: resting,
       preferCategories: intent?.prefer,
       avoidCategories: intent?.avoid,
@@ -177,6 +179,7 @@ function Generator() {
       preferredStyles: style ? [style] : (intent?.styles ?? preferences.preferredStyles),
       avoidColors: preferences.avoidColors,
       units: preferences.units,
+      today: todayKey(),
       preferCategories: intent?.prefer,
       avoidCategories: intent?.avoid,
     }) };

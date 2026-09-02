@@ -134,7 +134,9 @@ function anchor(items: ClothingItem[]): ScoreNote | null {
       rule: 'anchor',
       points: -14,
       itemIds: ids,
-      note: `${list(accents.map(colourWord))} are all fighting for the same job. Let one of them be the colour and put the rest back.`,
+      // Deduped, because "purple, yellow, burgundy and yellow" is what it said
+      // before, and a sentence that repeats itself reads as a machine talking.
+      note: `${list([...new Set(accents.map(colourWord))])} are all fighting for the same job. Let one of them be the colour and put the rest back.`,
     };
   }
 
@@ -381,10 +383,30 @@ function matchy(items: ClothingItem[]): ScoreNote | null {
   const hsls = trim.map((item) => hexToHsl(hexOf(item)));
   const lightnessSpread =
     Math.max(...hsls.map((c) => c.l)) - Math.min(...hsls.map((c) => c.l));
-  const hueSpread = Math.max(
-    ...hsls.flatMap((a) => hsls.map((b) => hueDistance(a.h, b.h))),
-  );
-  if (hueSpread > 18 || lightnessSpread > 18) return null;
+  if (lightnessSpread > 18) return null;
+
+  /*
+   * Hue only counts where there is a hue to compare.
+   *
+   * A warm grey watch face measures about thirty-three degrees, which sits it
+   * next to tan and gold — so a steel watch, a gold ring and tan sandals came
+   * back reported as "all the same colour", which is not a thing anybody would
+   * say. Below a real saturation a piece is not matching anything; it is grey.
+   *
+   * A set of near-neutrals CAN still be matchy, and is the canonical case — a
+   * black bag with black shoes and a black belt is exactly the look the rule
+   * was written for — so those are judged on lightness alone. What is never a
+   * set is a mixture of the two.
+   */
+  const saturated = hsls.filter((c) => c.s >= 20);
+  if (saturated.length !== 0 && saturated.length !== hsls.length) return null;
+
+  if (saturated.length) {
+    const hueSpread = Math.max(
+      ...saturated.flatMap((a) => saturated.map((b) => hueDistance(a.h, b.h))),
+    );
+    if (hueSpread > 18) return null;
+  }
 
   return {
     rule: 'matchy',
@@ -410,7 +432,18 @@ function matchy(items: ClothingItem[]): ScoreNote | null {
  * somebody looks at later and cannot say what is wrong with.
  */
 function metals(items: ClothingItem[], cannot: Cannot): ScoreNote | null {
-  const jewellery = items.filter((item) => hasMetal(item.category));
+  /*
+   * A watch is not jewellery for this purpose, and including it made the rule
+   * wrong far more often than right. A steel watch worn with gold rings is
+   * what a very large number of people wear every day — it is a functional
+   * object somebody owns one of, not a piece chosen to go with an outfit — and
+   * counting it fired a deduction on nearly every otherwise good outfit in a
+   * real wardrobe. A rule that cries wolf on the ordinary case teaches people
+   * to stop reading the card.
+   */
+  const jewellery = items.filter(
+    (item) => hasMetal(item.category) && item.category !== 'watch',
+  );
   if (jewellery.length < 2) return null;
 
   const known = jewellery.filter((item) => item.metal && item.metal !== 'other');
@@ -445,6 +478,18 @@ function metals(items: ClothingItem[], cannot: Cannot): ScoreNote | null {
       points: 4,
       itemIds: ids,
       note: 'Two metals, each of them repeated — which is the difference between mixing them and forgetting.',
+    };
+  }
+
+  // With one of each there is no odd one out, and naming either is arbitrary —
+  // it used to report whichever the Map happened to hold first, so the same
+  // pairing was blamed on gold in one outfit and silver in the next.
+  if (lonely.length === counts.size) {
+    return {
+      rule: 'metals',
+      points: -5,
+      itemIds: ids,
+      note: `One ${lonely.map((metal) => metal.replace('-', ' ')).join(' piece and one ')} piece. A second of either would make it read as a decision rather than an accident.`,
     };
   }
 

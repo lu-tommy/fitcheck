@@ -105,6 +105,14 @@ export function isNeutral(hex: string): boolean {
   if (h >= 15 && h <= 50 && s < 45) return true;
   // Navy behaves as a neutral even though it is saturated.
   if (h >= 200 && h <= 250 && l < 35) return true;
+  /*
+   * And so does indigo denim, which is the single most-worn colour in most
+   * wardrobes and goes with everything in them. Left out, the analyser counted
+   * a pair of jeans as an accent — so an outfit of jeans, a tee and a scarf was
+   * reported as three colours fighting, which is not a thing anybody has ever
+   * thought about a pair of jeans.
+   */
+  if (h >= 195 && h <= 250 && s < 45 && l >= 35 && l < 58) return true;
   return false;
 }
 
