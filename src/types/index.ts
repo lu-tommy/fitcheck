@@ -90,6 +90,33 @@ export type Pattern =
   | 'textured'
   | 'other';
 
+/**
+ * How much room a garment takes up on the body.
+ *
+ * The wardrobe knew colour, warmth, formality, season and style, and nothing at
+ * all about SHAPE — which is the first thing a stylist looks at. Volume against
+ * volume reads as pyjamas and fitted against fitted reads as a costume, and no
+ * amount of colour reasoning can see either. Optional on purpose: an outfit
+ * with nothing filled in is told the proportion question could not be judged,
+ * rather than being scored against a guess.
+ */
+export type Fit = 'fitted' | 'regular' | 'relaxed' | 'oversized';
+
+/** How far down a top, layer or dress reaches. Half of where the waist reads. */
+export type Length = 'cropped' | 'regular' | 'long';
+
+/** Where a bottom sits. The other half of where the waist reads. */
+export type Rise = 'low' | 'mid' | 'high';
+
+/**
+ * How big the print is.
+ *
+ * Pattern mixing works on scale contrast — a wide stripe with a micro check.
+ * Two prints of the same size fight, which is why the pattern name alone was
+ * never enough to judge an outfit carrying two of them.
+ */
+export type PatternScale = 'micro' | 'medium' | 'bold';
+
 export type Formality =
   | 'very-casual'
   | 'casual'
@@ -181,6 +208,12 @@ export interface ClothingItem {
   primaryColorHex: string;
   secondaryColors: string[];
   pattern: Pattern;
+  /** Only meaningful when `pattern` is not solid. Undefined means nobody said. */
+  patternScale?: PatternScale;
+  /** Shape — see Fit. All three stay undefined until somebody says. */
+  fit?: Fit;
+  length?: Length;
+  rise?: Rise;
   material?: string;
   brand?: string;
   formality: Formality;

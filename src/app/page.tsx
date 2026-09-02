@@ -16,12 +16,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { OutfitPill } from '@/components/outfit/OutfitCard';
 import { MemoryCard } from '@/components/MemoryCard';
 import { SafetyCard } from '@/components/SafetyCard';
+import { FitScoreCard } from '@/components/outfit/FitScoreCard';
 import { OutfitCollage } from '@/components/outfit/OutfitCollage';
 import { SlotPicker } from '@/components/outfit/SlotPicker';
 import { OutfitStack } from '@/components/outfit/OutfitStack';
 import { WeatherCard } from '@/components/WeatherCard';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { EmptyState, SectionHeader } from '@/components/ui/Feedback';
+import { scoreOutfit } from '@/domain/fitScore';
 import { buildOutfitLocally, cycleSlot, slotAlternatives } from '@/domain/outfitEngine';
 import { demoWardrobe } from '@/domain/seed';
 import { putPhoto } from '@/db';
@@ -148,6 +150,15 @@ export default function HomePage() {
     });
     return counts;
   }, [engineContext, shownIds]);
+
+  /*
+   * Scored from what is on screen, not from what the engine first proposed —
+   * swapping the shoes has to move the number or the number is decoration.
+   */
+  const fit = useMemo(
+    () => (suggestionItems.length >= 2 ? scoreOutfit(suggestionItems) : null),
+    [suggestionItems],
+  );
 
   const cycle = (item: ClothingItem, direction: 1 | -1) => {
     const next = cycleSlot(engineContext, shownIds ?? [], item.id, direction);
@@ -373,7 +384,17 @@ export default function HomePage() {
             />
 
             <div className="px-5">
-              <h2 className="text-title mt-3.5">{suggestion.name}</h2>
+              <div className="mt-3.5 flex items-baseline justify-between gap-3">
+                <h2 className="text-title min-w-0 truncate">{suggestion.name}</h2>
+                {fit ? (
+                  <p className="shrink-0 text-[0.875rem] text-[var(--text-muted)]">
+                    <span className="text-display tabular-nums" style={{ fontSize: '1.25rem' }}>
+                      {fit.score}
+                    </span>
+                    <span className="text-[var(--text-faint)]">/100 · {fit.verdict}</span>
+                  </p>
+                ) : null}
+              </div>
               <div className="mt-3 flex gap-2">
                 <Button full icon={<Check size={17} />} onClick={saveSuggestion}>
                   Wear this
@@ -395,6 +416,7 @@ export default function HomePage() {
               <p className="mt-4 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
                 {suggestion.explanation}
               </p>
+              {fit ? <FitScoreCard report={fit} className="mt-4" /> : null}
             </div>
           </section>
         ) : (

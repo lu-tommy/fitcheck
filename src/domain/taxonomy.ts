@@ -1,7 +1,11 @@
 import type {
   Category,
+  Fit,
   Formality,
+  Length,
   Pattern,
+  PatternScale,
+  Rise,
   Season,
   Slot,
   Style,
@@ -407,3 +411,79 @@ export const OCCASIONS = [
   { key: 'home', label: 'Home', prompt: "I'm staying home today", formality: 'very-casual' as Formality },
   { key: 'party', label: 'Party', prompt: "I'm going to a party", formality: 'smart-casual' as Formality },
 ];
+
+/* ------------------------------------------------------------------ shape -- */
+
+export const FIT_ORDER: Fit[] = ['fitted', 'regular', 'relaxed', 'oversized'];
+
+export const FIT_LABEL: Record<Fit, string> = {
+  fitted: 'Fitted',
+  regular: 'Regular',
+  relaxed: 'Relaxed',
+  oversized: 'Oversized',
+};
+
+export const LENGTH_ORDER: Length[] = ['cropped', 'regular', 'long'];
+
+export const LENGTH_LABEL: Record<Length, string> = {
+  cropped: 'Cropped',
+  regular: 'Regular',
+  long: 'Long',
+};
+
+export const RISE_ORDER: Rise[] = ['low', 'mid', 'high'];
+
+export const RISE_LABEL: Record<Rise, string> = {
+  low: 'Low rise',
+  mid: 'Mid rise',
+  high: 'High rise',
+};
+
+export const PATTERN_SCALE_ORDER: PatternScale[] = ['micro', 'medium', 'bold'];
+
+export const PATTERN_SCALE_LABEL: Record<PatternScale, string> = {
+  micro: 'Micro',
+  medium: 'Medium',
+  bold: 'Bold',
+};
+
+/**
+ * Which shape questions a garment can answer.
+ *
+ * Asking a pair of sunglasses how it is cut is the sort of thing that turns a
+ * two-field form into the fourteen-input form the reviews describe people
+ * quitting over. Volume matters on anything that covers the body; where the hem
+ * falls only matters above the waist; rise only exists below it.
+ */
+const VOLUME_SLOTS: Slot[] = ['top', 'midlayer', 'outerwear', 'bottom', 'fullbody'];
+const HEM_SLOTS: Slot[] = ['top', 'midlayer', 'outerwear', 'fullbody'];
+
+export function hasFit(category: Category): boolean {
+  return VOLUME_SLOTS.includes(slotOf(category));
+}
+
+export function hasLength(category: Category): boolean {
+  return HEM_SLOTS.includes(slotOf(category));
+}
+
+export function hasRise(category: Category): boolean {
+  return slotOf(category) === 'bottom';
+}
+
+/**
+ * Roughly how much of a dressed person each slot covers.
+ *
+ * Colour harmony was counted one garment per vote, which makes a scarf argue
+ * with a coat on equal terms. 60/30/10 is a rule about AREA, so judging it
+ * needs an area, and these are the numbers a flat lay already implies.
+ */
+export const VISUAL_AREA: Record<Slot, number> = {
+  fullbody: 5,
+  outerwear: 4,
+  top: 3,
+  bottom: 3,
+  midlayer: 2,
+  footwear: 1,
+  headwear: 0.5,
+  accessory: 0.4,
+};

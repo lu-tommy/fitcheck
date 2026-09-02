@@ -6,20 +6,42 @@ import { careSummary, suggestedCare } from '@/domain/care';
 import { hexForColorName } from '@/domain/color';
 import { categoryMeta,
   CATEGORIES,
+  FIT_LABEL,
+  FIT_ORDER,
   FORMALITY_LABEL,
   FORMALITY_ORDER,
+  LENGTH_LABEL,
+  LENGTH_ORDER,
   MATERIALS,
   PATTERNS,
   PATTERN_LABEL,
+  PATTERN_SCALE_LABEL,
+  PATTERN_SCALE_ORDER,
+  RISE_LABEL,
+  RISE_ORDER,
   SEASONS,
   SEASON_LABEL,
   STYLES,
   STYLE_LABEL,
   categoryLabel,
+  hasFit,
+  hasLength,
+  hasRise,
 } from '@/domain/taxonomy';
 import { COLOR_NAMES, swatches } from '@/lib/palette';
 import { titleCase } from '@/lib/format';
-import type { CareInstructions, Category, Formality, Pattern, Season, Style } from '@/types';
+import type {
+  CareInstructions,
+  Category,
+  Fit,
+  Formality,
+  Length,
+  Pattern,
+  PatternScale,
+  Rise,
+  Season,
+  Style,
+} from '@/types';
 
 import { BrandPicker } from '@/components/closet/BrandPicker';
 import { CareForm, EMPTY_CARE } from '@/components/closet/CareForm';
@@ -34,6 +56,11 @@ export interface ItemDraft {
   primaryColorHex: string;
   secondaryColors: string[];
   pattern: Pattern;
+  /** Empty string means unset — the draft's version of undefined. */
+  patternScale: PatternScale | '';
+  fit: Fit | '';
+  length: Length | '';
+  rise: Rise | '';
   material: string;
   brand: string;
   formality: Formality;
@@ -52,6 +79,10 @@ export const EMPTY_DRAFT: ItemDraft = {
   primaryColorHex: swatches.black,
   secondaryColors: [],
   pattern: 'solid',
+  patternScale: '',
+  fit: '',
+  length: '',
+  rise: '',
   material: '',
   brand: '',
   formality: 'casual',
@@ -180,7 +211,12 @@ export function ItemForm({
       <Field label="Pattern">
         <Select
           value={draft.pattern}
-          onChange={(event) => onChange({ pattern: event.target.value as Pattern })}
+          onChange={(event) => {
+            // Scale is a fact about a print. Going back to solid should not
+            // leave a stale "bold" behind for the scorer to reason from.
+            const pattern = event.target.value as Pattern;
+            onChange(pattern === 'solid' ? { pattern, patternScale: '' } : { pattern });
+          }}
         >
           {PATTERNS.map((pattern) => (
             <option key={pattern} value={pattern}>
@@ -189,6 +225,58 @@ export function ItemForm({
           ))}
         </Select>
       </Field>
+
+      {/* Only worth asking about a garment that has a print on it. */}
+      {draft.pattern !== 'solid' ? (
+        <Picker
+          label="How big is the print?"
+          hint="Two prints of the same size fight; a wide stripe with a micro check does not."
+          options={PATTERN_SCALE_ORDER.map((scale) => ({
+            value: scale,
+            label: PATTERN_SCALE_LABEL[scale],
+          }))}
+          value={draft.patternScale}
+          onPick={(patternScale) => onChange({ patternScale })}
+        />
+      ) : null}
+
+      {/*
+        * Shape. The wardrobe knew colour, warmth and formality and nothing at
+        * all about how a thing is cut, which is the first thing anybody looks
+        * at — volume against volume reads as pyjamas. Each question only
+        * appears on a garment that can answer it, so a pair of sunglasses is
+        * never asked how it fits.
+        */}
+      {hasFit(draft.category) ? (
+        <Picker
+          label="How it fits"
+          hint="Balance is the rule: volume wants something fitted next to it."
+          options={FIT_ORDER.map((fit) => ({ value: fit, label: FIT_LABEL[fit] }))}
+          value={draft.fit}
+          onPick={(fit) => onChange({ fit })}
+        />
+      ) : null}
+
+      {hasLength(draft.category) ? (
+        <Picker
+          label="Where it ends"
+          options={LENGTH_ORDER.map((length) => ({
+            value: length,
+            label: LENGTH_LABEL[length],
+          }))}
+          value={draft.length}
+          onPick={(length) => onChange({ length })}
+        />
+      ) : null}
+
+      {hasRise(draft.category) ? (
+        <Picker
+          label="Where it sits"
+          options={RISE_ORDER.map((rise) => ({ value: rise, label: RISE_LABEL[rise] }))}
+          value={draft.rise}
+          onPick={(rise) => onChange({ rise })}
+        />
+      ) : null}
 
       <div>
         <span className="text-label mb-2 block text-[var(--text-muted)]">Material</span>
@@ -335,6 +423,49 @@ export function ItemForm({
           </Field>
         </div>
       </details>
+    </div>
+  );
+}
+
+/**
+ * One optional choice out of three or four.
+ *
+ * Tapping the selected chip clears it, because "I do not know" and "regular"
+ * are different answers and the scorer treats them differently: unset means the
+ * proportion question is reported as unjudged rather than scored on a guess.
+ */
+function Picker<T extends string>({
+  label,
+  hint,
+  options,
+  value,
+  onPick,
+}: {
+  label: string;
+  hint?: string;
+  options: { value: T; label: string }[];
+  value: T | '';
+  onPick: (value: T | '') => void;
+}) {
+  return (
+    <div>
+      <span className="text-label mb-2 block text-[var(--text-muted)]">
+        {label} <span className="normal-case opacity-70">(optional)</span>
+      </span>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <Chip
+            key={option.value}
+            selected={value === option.value}
+            onClick={() => onPick(value === option.value ? '' : option.value)}
+          >
+            {option.label}
+          </Chip>
+        ))}
+      </div>
+      {hint ? (
+        <p className="mt-1.5 text-[0.8125rem] text-[var(--text-faint)]">{hint}</p>
+      ) : null}
     </div>
   );
 }

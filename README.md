@@ -266,6 +266,44 @@ in the first so the two are genuinely different, and share both as a single
 picture. This is the one feature in the roadmap that the commercial apps
 structurally cannot copy: their user is one person alone with an app.
 
+## Is it any good?
+
+The engine could always say whether an outfit was *valid* — right slots, warm
+enough, pitched at the right formality, made only of things you own. None of
+that is the question somebody is asking in front of a mirror.
+
+`domain/fitScore` answers the other one, in seven rules, each of which returns a
+credit, a deduction, or an admission that it could not tell:
+
+- **Anchor.** 60/30/10, judged on AREA rather than one garment one vote — a pair
+  of socks should not argue with a coat on equal terms. One colour across most
+  of an outfit is tonal and reads deliberate; two is where the eye stops knowing
+  where to go.
+- **Volume.** Loose over loose reads as pyjamas, fitted over fitted as a
+  costume. Volume against something fitted is the balance stylists lead with.
+- **Waistline.** Cutting the body in half shortens the whole silhouette; a tuck,
+  a crop or a high rise is what makes the same two garments look considered.
+- **Pattern.** Mixing works on scale contrast. Two prints the same size fight,
+  and three is past the line.
+- **Third piece.** Top, bottom and shoes stops there and reads unfinished. A
+  jacket, a knit or one real piece of jewellery is the whole difference — and a
+  belt does not count, which is what the focal weights are for.
+- **Matching.** A bag matching the shoes matching the belt stopped reading as
+  elegant a while ago.
+- **Register.** A very-casual tank with formal trousers is what you notice
+  across a room.
+
+**Nothing here guesses.** A rule with no data to work from says what would let it
+answer — *"say how the indigo jeans fit and the proportions can be judged"* —
+rather than scoring the outfit against an assumption, and the card shows those
+lines alongside the ones that moved the number. A score nobody can interrogate
+is a gimmick; a score that says why is a stylist.
+
+That needed three facts the wardrobe never held: `fit`, `length` and `rise`, plus
+`patternScale`. All optional, all undefined until somebody says, and each one
+only offered on a garment that can answer it — a pair of sunglasses is never
+asked how it is cut.
+
 ## Care instructions
 
 Each item can carry its label — wash, cycle, dry, iron, bleach, plus the short
