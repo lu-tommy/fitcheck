@@ -31,8 +31,9 @@ type Shape =
   | 'dress' | 'jumpsuit' | 'suit'
   | 'sneaker' | 'boot' | 'derby' | 'sandal'
   | 'cap' | 'beanie' | 'hat'
-  | 'watch' | 'belt' | 'necklace' | 'bracelet' | 'ring' | 'sunglasses' | 'scarf'
-  | 'tie' | 'bag' | 'gloves';
+  | 'watch' | 'belt' | 'necklace' | 'earrings' | 'bracelet' | 'ring' | 'brooch'
+  | 'sunglasses' | 'scarf' | 'tie' | 'bowtie' | 'pocketsquare'
+  | 'headband' | 'hairclip' | 'socks' | 'tights' | 'bag' | 'gloves';
 
 const SHAPE_OF: Record<Category, Shape> = {
   tshirt: 'tee', polo: 'polo', shirt: 'shirt', blouse: 'shirt', tank: 'tank',
@@ -45,8 +46,11 @@ const SHAPE_OF: Record<Category, Shape> = {
   sneakers: 'sneaker', boots: 'boot', 'dress-shoes': 'derby', loafers: 'derby',
   sandals: 'sandal',
   hat: 'hat', cap: 'cap', beanie: 'beanie',
-  watch: 'watch', belt: 'belt', necklace: 'necklace', bracelet: 'bracelet',
-  ring: 'ring', sunglasses: 'sunglasses', scarf: 'scarf', tie: 'tie', bag: 'bag',
+  watch: 'watch', belt: 'belt', necklace: 'necklace', earrings: 'earrings',
+  bracelet: 'bracelet', ring: 'ring', brooch: 'brooch',
+  sunglasses: 'sunglasses', scarf: 'scarf', tie: 'tie', 'bow-tie': 'bowtie',
+  'pocket-square': 'pocketsquare', headband: 'headband', 'hair-clip': 'hairclip',
+  socks: 'socks', tights: 'tights', bag: 'bag',
   gloves: 'gloves', other: 'bag',
 };
 
@@ -502,6 +506,134 @@ function build(shape: Shape): Drawing {
       const lines = new Path2D();
       lines.moveTo(162, 190); lines.lineTo(238, 190);
       return { body: p, lines, stroke: 4 };
+    }
+
+    case 'earrings': {
+      // A pair, laid the way they sit in a dish: the hoop, and the drop
+      // swinging out of it. One earring on its own reads as a pendant.
+      const p = new Path2D();
+      const holes = new Path2D();
+      for (const cx of [142, 258]) {
+        p.ellipse(cx, 168, 30, 30, 0, 0, Math.PI * 2);
+        p.moveTo(cx, 196);
+        p.quadraticCurveTo(cx + 46, 262, cx + 32, 314);
+        p.quadraticCurveTo(cx, 356, cx - 32, 314);
+        p.quadraticCurveTo(cx - 46, 262, cx, 196);
+        p.closePath();
+        holes.ellipse(cx, 168, 17, 17, 0, 0, Math.PI * 2);
+      }
+      return { body: p, holes };
+    }
+
+    case 'brooch': {
+      // The bar behind it is what makes this a thing that fastens to a lapel
+      // rather than a pendant on a missing chain.
+      const p = new Path2D();
+      p.roundRect(96, 240, 216, 16, 8);
+      for (let i = 0; i < 6; i += 1) {
+        const angle = (i / 6) * Math.PI * 2;
+        p.ellipse(200 + Math.cos(angle) * 54, 248 + Math.sin(angle) * 54, 40, 40, 0, 0, Math.PI * 2);
+      }
+      p.ellipse(200, 248, 46, 46, 0, 0, Math.PI * 2);
+      const holes = new Path2D();
+      holes.ellipse(200, 248, 22, 22, 0, 0, Math.PI * 2);
+      return { body: p, holes };
+    }
+
+    case 'bowtie': {
+      const p = new Path2D();
+      p.moveTo(56, 176);
+      p.quadraticCurveTo(46, 250, 56, 324);
+      p.lineTo(180, 278); p.lineTo(180, 222); p.closePath();
+      p.moveTo(344, 176);
+      p.quadraticCurveTo(354, 250, 344, 324);
+      p.lineTo(220, 278); p.lineTo(220, 222); p.closePath();
+      p.roundRect(176, 206, 48, 88, 12);
+      const lines = new Path2D();
+      lines.moveTo(76, 204); lines.quadraticCurveTo(120, 250, 76, 296);
+      lines.moveTo(324, 204); lines.quadraticCurveTo(280, 250, 324, 296);
+      return { body: p, lines, stroke: 4 };
+    }
+
+    case 'pocketsquare': {
+      // Three peaks out of a fold, which is how one sits in a breast pocket. A
+      // flat square reads as a napkin.
+      const p = new Path2D();
+      p.moveTo(96, 332);
+      p.lineTo(122, 196); p.lineTo(160, 300);
+      p.lineTo(200, 150); p.lineTo(240, 300);
+      p.lineTo(278, 196); p.lineTo(304, 332);
+      p.closePath();
+      const lines = new Path2D();
+      lines.moveTo(102, 306); lines.lineTo(298, 306);
+      return { body: p, lines, stroke: 4 };
+    }
+
+    case 'headband': {
+      // Open at the bottom, because a closed ring is a bracelet.
+      const p = new Path2D();
+      const from = Math.PI * 0.78;
+      const to = Math.PI * 2.22;
+      p.moveTo(200 + Math.cos(from) * 108, 268 + Math.sin(from) * 108);
+      p.arc(200, 268, 108, from, to, false);
+      p.lineTo(200 + Math.cos(to) * 78, 268 + Math.sin(to) * 78);
+      p.arc(200, 268, 78, to, from, true);
+      p.closePath();
+      return { body: p };
+    }
+
+    case 'hairclip': {
+      // A claw clip: two jaws hinged at the top, teeth meeting down the open
+      // side. Drawn as one jaw it was a comma.
+      const p = new Path2D();
+      p.moveTo(120, 138); p.quadraticCurveTo(70, 268, 132, 386);
+      p.lineTo(178, 372); p.quadraticCurveTo(126, 264, 168, 152); p.closePath();
+      p.moveTo(280, 138); p.quadraticCurveTo(330, 268, 268, 386);
+      p.lineTo(222, 372); p.quadraticCurveTo(274, 264, 232, 152); p.closePath();
+      const lines = new Path2D();
+      for (let y = 194; y <= 336; y += 34) {
+        lines.moveTo(150, y); lines.lineTo(184, y + 6);
+        lines.moveTo(250, y); lines.lineTo(216, y + 6);
+      }
+      return { body: p, lines, stroke: 4 };
+    }
+
+    case 'socks': {
+      // A pair laid flat, toes the same way, ribbing at the cuff — the ribbing
+      // is the whole difference between a sock and a boot.
+      const p = new Path2D();
+      const lines = new Path2D();
+      for (const cx of [120, 268] as const) {
+        p.moveTo(cx - 34, 128);
+        p.lineTo(cx + 34, 128);
+        p.lineTo(cx + 34, 302);
+        p.quadraticCurveTo(cx + 38, 340, cx + 74, 346);
+        p.quadraticCurveTo(cx + 94, 350, cx + 92, 372);
+        p.quadraticCurveTo(cx + 90, 392, cx + 60, 392);
+        p.lineTo(cx - 34, 392);
+        p.quadraticCurveTo(cx - 40, 350, cx - 34, 302);
+        p.closePath();
+        for (let y = 142; y <= 184; y += 14) {
+          lines.moveTo(cx - 30, y);
+          lines.lineTo(cx + 30, y);
+        }
+      }
+      return { body: p, lines, stroke: 4 };
+    }
+
+    case 'tights': {
+      // Trouser-shaped but drawn thin, because the point of them is that they
+      // are hosiery and not a pair of leggings.
+      const p = new Path2D();
+      p.moveTo(140, 108);
+      p.lineTo(260, 108);
+      p.lineTo(250, 214); p.lineTo(238, 396); p.lineTo(212, 396);
+      p.lineTo(200, 238);
+      p.lineTo(188, 396); p.lineTo(162, 396); p.lineTo(150, 214);
+      p.closePath();
+      const lines = new Path2D();
+      lines.moveTo(142, 144); lines.lineTo(258, 144);
+      return { body: p, lines, stroke: 5 };
     }
 
     case 'gloves': {

@@ -1,5 +1,9 @@
 import { buildOutfitLocally } from '@/domain/outfitEngine';
-import { slotOf, MAX_ACCESSORIES } from '@/domain/taxonomy';
+import {
+  ACCESSORY_FOCAL_BUDGET,
+  accessoryFocalWeight,
+  slotOf,
+} from '@/domain/taxonomy';
 import type { ClothingItem, WeatherSnapshot } from '@/types';
 
 import { basicCloset, emptyRequest, makeItem } from './factories';
@@ -133,18 +137,24 @@ describe('buildOutfitLocally', () => {
     expect(outfit.itemIds).not.toContain('worn');
   });
 
-  // Three is the stylists' number, and one per position — see MAX_ACCESSORIES
-  // and accessories.test.ts, which covers the positional rule in full.
-  it('keeps accessories to a sensible number', () => {
+  // Three focal points, not three objects — see ACCESSORY_FOCAL_WEIGHT, and
+  // accessories.test.ts, which covers the positional rule in full.
+  it('keeps accessories within the attention an outfit can carry', () => {
     const closet = [
       ...basicCloset(),
       makeItem({ id: 'belt', category: 'belt' }),
       makeItem({ id: 'necklace', category: 'necklace' }),
       makeItem({ id: 'sunglasses', category: 'sunglasses' }),
       makeItem({ id: 'ring', category: 'ring' }),
+      makeItem({ id: 'bag', category: 'bag' }),
+      makeItem({ id: 'earrings', category: 'earrings' }),
     ];
     const outfit = buildOutfitLocally({ request: emptyRequest, closet, weather: weather(20) });
-    const accessories = slotsOf(outfit.itemIds, closet).filter((slot) => slot === 'accessory');
-    expect(accessories.length).toBeLessThanOrEqual(MAX_ACCESSORIES);
+    const index = new Map(closet.map((item) => [item.id, item]));
+    const spent = outfit.itemIds
+      .map((id) => index.get(id)!)
+      .filter((item) => slotOf(item.category) === 'accessory')
+      .reduce((total, item) => total + accessoryFocalWeight(item.category), 0);
+    expect(spent).toBeLessThanOrEqual(ACCESSORY_FOCAL_BUDGET);
   });
 });

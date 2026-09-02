@@ -59,11 +59,19 @@ export const CATEGORIES: CategoryMeta[] = [
   { category: 'watch', label: 'Watch', slot: 'accessory', warmth: 0, formality: 'smart-casual' },
   { category: 'belt', label: 'Belt', slot: 'accessory', warmth: 0, formality: 'smart-casual' },
   { category: 'necklace', label: 'Necklace', slot: 'accessory', warmth: 0, formality: 'smart-casual' },
+  { category: 'earrings', label: 'Earrings', slot: 'accessory', warmth: 0, formality: 'casual' },
   { category: 'bracelet', label: 'Bracelet', slot: 'accessory', warmth: 0, formality: 'casual' },
   { category: 'ring', label: 'Ring', slot: 'accessory', warmth: 0, formality: 'casual' },
+  { category: 'brooch', label: 'Brooch', slot: 'accessory', warmth: 0, formality: 'business-casual' },
   { category: 'sunglasses', label: 'Sunglasses', slot: 'accessory', warmth: 0, formality: 'casual' },
   { category: 'scarf', label: 'Scarf', slot: 'accessory', warmth: 2, formality: 'casual' },
   { category: 'tie', label: 'Tie', slot: 'accessory', warmth: 0, formality: 'formal' },
+  { category: 'bow-tie', label: 'Bow tie', slot: 'accessory', warmth: 0, formality: 'formal' },
+  { category: 'pocket-square', label: 'Pocket square', slot: 'accessory', warmth: 0, formality: 'formal' },
+  { category: 'headband', label: 'Headband', slot: 'accessory', warmth: 0, formality: 'casual' },
+  { category: 'hair-clip', label: 'Hair clip', slot: 'accessory', warmth: 0, formality: 'casual' },
+  { category: 'socks', label: 'Socks', slot: 'accessory', warmth: 0, formality: 'casual' },
+  { category: 'tights', label: 'Tights', slot: 'accessory', warmth: 1, formality: 'smart-casual' },
   { category: 'bag', label: 'Bag', slot: 'accessory', warmth: 0, formality: 'casual' },
   { category: 'gloves', label: 'Gloves', slot: 'accessory', warmth: 2, formality: 'casual' },
   { category: 'other', label: 'Other', slot: 'accessory', warmth: 0, formality: 'casual' },
@@ -118,24 +126,36 @@ export const SLOT_LABEL: Record<Slot, string> = {
  * only one thing goes round a wrist at a time.
  */
 export type AccessoryPosition =
+  | 'head'
   | 'eyes'
+  | 'ears'
   | 'neck'
+  | 'chest'
   | 'wrist'
   | 'finger'
   | 'waist'
+  | 'legs'
   | 'carried'
   | 'hands'
   | 'other';
 
 const ACCESSORY_POSITION: Partial<Record<Category, AccessoryPosition>> = {
+  headband: 'head',
+  'hair-clip': 'head',
   sunglasses: 'eyes',
+  earrings: 'ears',
   necklace: 'neck',
   scarf: 'neck',
   tie: 'neck',
+  'bow-tie': 'neck',
+  brooch: 'chest',
+  'pocket-square': 'chest',
   watch: 'wrist',
   bracelet: 'wrist',
   ring: 'finger',
   belt: 'waist',
+  socks: 'legs',
+  tights: 'legs',
   bag: 'carried',
   gloves: 'hands',
   other: 'other',
@@ -146,36 +166,80 @@ export function accessoryPosition(category: Category): AccessoryPosition {
 }
 
 export const ACCESSORY_POSITION_LABEL: Record<AccessoryPosition, string> = {
+  head: 'Hair',
   eyes: 'Eyewear',
+  ears: 'Earrings',
   neck: 'Neck',
+  chest: 'Lapel',
   wrist: 'Wrist',
   finger: 'Rings',
   waist: 'Waist',
+  legs: 'Legwear',
   carried: 'Bag',
   hands: 'Hands',
   other: 'Accessory',
 };
 
-/** The order accessories are offered and drawn in, roughly head to hands. */
+/** The order accessories are offered and drawn in, roughly head to toe. */
 export const ACCESSORY_POSITION_ORDER: AccessoryPosition[] = [
+  'head',
   'eyes',
+  'ears',
   'neck',
+  'chest',
   'wrist',
   'finger',
   'waist',
+  'legs',
   'carried',
   'hands',
   'other',
 ];
 
 /**
- * How many accessories an outfit should carry.
+ * How much attention one accessory asks for.
  *
- * The rule stylists actually use is three: past that, pieces stop supporting
- * the outfit and start competing with it. One per position on top of that,
- * because two watches is not a look.
+ * The rule stylists use is three — past that, pieces stop supporting an outfit
+ * and start arguing with it. This used to be implemented as a cap of three
+ * OBJECTS, which is not the same claim and gets ordinary dressing wrong in both
+ * directions. A belt half-hidden under a jacket spent the same budget as a
+ * statement necklace, so a belt, a watch and sunglasses filled the whole
+ * allowance and locked out the one piece anybody would actually notice; while
+ * three thin bracelets on the same wrist read as a single point and were
+ * counted as the lot.
+ *
+ * So the budget is spent in focal points rather than in things. Roughly: a
+ * piece somebody would comment on costs 1, a piece they would register costs
+ * about a half, and a piece that is simply doing its job costs a fraction.
  */
-export const MAX_ACCESSORIES = 3;
+const ACCESSORY_FOCAL_WEIGHT: Partial<Record<Category, number>> = {
+  necklace: 1,
+  earrings: 1,
+  bag: 1,
+  scarf: 1,
+  'bow-tie': 0.9,
+  sunglasses: 0.8,
+  tie: 0.8,
+  brooch: 0.8,
+  headband: 0.7,
+  watch: 0.6,
+  bracelet: 0.6,
+  gloves: 0.5,
+  'pocket-square': 0.5,
+  tights: 0.4,
+  'hair-clip': 0.3,
+  socks: 0.3,
+  ring: 0.3,
+  belt: 0.3,
+};
+
+/** Unknown pieces sit in the middle: noticeable, not a statement. */
+export function accessoryFocalWeight(category: Category): number {
+  return ACCESSORY_FOCAL_WEIGHT[category] ?? 0.5;
+}
+
+/** The rule of three, measured in focal points rather than in objects. */
+export const ACCESSORY_FOCAL_BUDGET = 3;
 
 /**
  * The order a wardrobe is browsed in, which is not the order an outfit is
@@ -318,6 +382,10 @@ export const MATERIALS = [
   'Corduroy',
   'Canvas',
   'Knit',
+  // Not a fabric, but the wardrobe now holds earrings, brooches and rings, and
+  // an editor offering only cloth for them reads as a list that forgot they
+  // exist. Nothing washes it — see NEVER_WASHED in domain/care.
+  'Metal',
 ];
 
 export const LAUNDRY_LABEL = {

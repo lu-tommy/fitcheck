@@ -1,5 +1,10 @@
 import { buildOutfitLocally, cycleSlot, slotAlternatives } from '@/domain/outfitEngine';
-import { MAX_ACCESSORIES, accessoryPosition, slotOf } from '@/domain/taxonomy';
+import {
+  ACCESSORY_FOCAL_BUDGET,
+  accessoryFocalWeight,
+  accessoryPosition,
+  slotOf,
+} from '@/domain/taxonomy';
 import type { ClothingItem, OutfitRequest } from '@/types';
 
 import { makeItem } from './factories';
@@ -39,6 +44,9 @@ function closetWithAccessories(): ClothingItem[] {
   ];
 }
 
+const focalOf = (items: ClothingItem[]) =>
+  items.reduce((total, item) => total + accessoryFocalWeight(item.category), 0);
+
 const build = (closet = closetWithAccessories()) =>
   buildOutfitLocally({ request, closet }).itemIds
     .map((id) => closet.find((item) => item.id === id)!)
@@ -64,9 +72,23 @@ describe('choosing accessories', () => {
     expect(new Set(positions).size).toBe(positions.length);
   });
 
-  it('stops at three, the way a stylist would', () => {
+  it('spends no more than three focal points', () => {
     const worn = build().filter((item) => slotOf(item.category) === 'accessory');
-    expect(worn.length).toBeLessThanOrEqual(MAX_ACCESSORIES);
+    expect(focalOf(worn)).toBeLessThanOrEqual(ACCESSORY_FOCAL_BUDGET);
+  });
+
+  /*
+   * The cap used to be three OBJECTS, which is not the rule stylists mean and
+   * gets ordinary dressing wrong in both directions: a belt half-hidden under a
+   * jacket spent the same allowance as a statement necklace, so a belt, a watch
+   * and a pair of sunglasses filled it and the chain never came out of the
+   * drawer.
+   */
+  it('lets the quiet pieces through, because they cost almost nothing', () => {
+    const worn = build().filter((item) => slotOf(item.category) === 'accessory');
+    expect(worn.map((item) => item.category)).toContain('necklace');
+    expect(worn.length).toBeGreaterThan(3);
+    expect(focalOf(worn)).toBeLessThanOrEqual(ACCESSORY_FOCAL_BUDGET);
   });
 
   it('wears more than one accessory when there are several to wear', () => {
@@ -122,5 +144,88 @@ describe('changing one accessory', () => {
     const closet = closetWithAccessories();
     const ids = ['tee', 'jeans', 'shoes', 'bag'];
     expect(cycleSlot(context(closet), ids, 'bag', 1)).toEqual(ids);
+  });
+});
+
+/**
+ * The list used to stop at eleven categories, which left out the single
+ * most-worn accessory in the world and everything 2026 styling has moved to the
+ * middle of an outfit — visible socks, a brooch on a lapel, a scarf in the hair.
+ */
+describe('the accessories people actually own', () => {
+  it('knows where the new ones go', () => {
+    expect(accessoryPosition('earrings')).toBe('ears');
+    expect(accessoryPosition('headband')).toBe('head');
+    expect(accessoryPosition('hair-clip')).toBe('head');
+    expect(accessoryPosition('brooch')).toBe('chest');
+    expect(accessoryPosition('pocket-square')).toBe('chest');
+    expect(accessoryPosition('bow-tie')).toBe('neck');
+    expect(accessoryPosition('socks')).toBe('legs');
+    expect(accessoryPosition('tights')).toBe('legs');
+  });
+
+  it('offers a headband against a hair clip, not against a necklace', () => {
+    const closet = [
+      makeItem({ id: 'tee', category: 'tshirt' }),
+      makeItem({ id: 'jeans', category: 'jeans' }),
+      makeItem({ id: 'shoes', category: 'sneakers' }),
+      makeItem({ id: 'band', category: 'headband' }),
+      makeItem({ id: 'clip', category: 'hair-clip' }),
+      makeItem({ id: 'chain', category: 'necklace' }),
+      makeItem({ id: 'studs', category: 'earrings' }),
+    ];
+    const ids = ['tee', 'jeans', 'shoes', 'band'];
+    const options = slotAlternatives({ request, closet }, ids, 'band').map((item) => item.id);
+    expect(options).toContain('clip');
+    expect(options).not.toContain('chain');
+    expect(options).not.toContain('studs');
+  });
+
+  it('wears earrings and a necklace together, because they are not the same place', () => {
+    const closet = [
+      makeItem({ id: 'tee', category: 'tshirt' }),
+      makeItem({ id: 'jeans', category: 'jeans' }),
+      makeItem({ id: 'shoes', category: 'sneakers' }),
+      makeItem({ id: 'chain', category: 'necklace' }),
+      makeItem({ id: 'studs', category: 'earrings' }),
+    ];
+    const worn = buildOutfitLocally({ request, closet }).itemIds;
+    expect(worn).toContain('chain');
+    expect(worn).toContain('studs');
+  });
+
+  /*
+   * Position is meant to describe what physically competes, and a headband and
+   * a beanie plainly do. Nothing else in the wardrobe conflicts across slots
+   * like this, so the engine states it rather than the position table claiming
+   * a beanie is an accessory.
+   */
+  it('does not put a headband on under a beanie', () => {
+    const cold = { ...request, temperature: -2 };
+    const closet = [
+      makeItem({ id: 'tee', category: 'longsleeve' }),
+      makeItem({ id: 'jeans', category: 'jeans' }),
+      makeItem({ id: 'shoes', category: 'boots' }),
+      makeItem({ id: 'beanie', category: 'beanie' }),
+      makeItem({ id: 'band', category: 'headband' }),
+    ];
+    const worn = buildOutfitLocally({ request: cold, closet }).itemIds;
+    expect(worn).toContain('beanie');
+    expect(worn).not.toContain('band');
+
+    // With no hat in the wardrobe there is nothing to conflict with.
+    const hatless = closet.filter((item) => item.id !== 'beanie');
+    expect(buildOutfitLocally({ request: cold, closet: hatless }).itemIds).toContain('band');
+  });
+
+  it('picks socks or tights, never both', () => {
+    const closet = [
+      makeItem({ id: 'dress', category: 'dress' }),
+      makeItem({ id: 'shoes', category: 'boots' }),
+      makeItem({ id: 'socks', category: 'socks' }),
+      makeItem({ id: 'tights', category: 'tights' }),
+    ];
+    const worn = buildOutfitLocally({ request, closet }).itemIds;
+    expect(worn.filter((id) => id === 'socks' || id === 'tights')).toHaveLength(1);
   });
 });

@@ -156,6 +156,24 @@ const MATERIAL_DEFAULTS: Record<string, Omit<CareInstructions, 'source'>> = {
 };
 
 /**
+ * The hard objects, which never see water whatever they are made of.
+ *
+ * This named the watch alone, which was fair when a watch was the only such
+ * thing the wardrobe could hold. It is not any more: a brooch, a pair of hoops
+ * or a signet ring sorted into a delicates load is the kind of advice that
+ * costs somebody something they cannot replace.
+ */
+const NEVER_WASHED: ClothingItem['category'][] = [
+  'watch',
+  'ring',
+  'necklace',
+  'earrings',
+  'bracelet',
+  'brooch',
+  'sunglasses',
+];
+
+/**
  * A starting point from the material, offered as a suggestion the wearer can
  * overrule. Marked `material-default` so the UI never presents a guess with
  * the same confidence as something read off the label.
@@ -164,7 +182,7 @@ export function suggestedCare(item: {
   material?: string;
   category: ClothingItem['category'];
 }): CareInstructions | null {
-  if (slotOf(item.category) === 'footwear' || item.category === 'watch') {
+  if (slotOf(item.category) === 'footwear' || NEVER_WASHED.includes(item.category)) {
     return { wash: 'do-not-wash', flags: [], source: 'material-default' };
   }
   const key = item.material?.trim().toLowerCase();

@@ -12,7 +12,8 @@ import type {
 
 import { analyzeHarmony, hexForColorName } from './color';
 import {
-  MAX_ACCESSORIES,
+  ACCESSORY_FOCAL_BUDGET,
+  accessoryFocalWeight,
   accessoryPosition,
   categoryMeta,
   formalityScore,
@@ -307,11 +308,12 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
   }
 
   /*
-   * Accessories, one per position and no more than three in total.
+   * Accessories: one per position, up to three focal points in total.
    *
-   * Position is what competes: a watch and a belt and sunglasses all go on at
-   * once, but only one thing goes round a wrist. Three is the number stylists
-   * use — past that, pieces stop supporting an outfit and start arguing with it.
+   * Position is what competes physically — a watch and a belt and sunglasses
+   * all go on at once, but only one thing goes round a wrist. Attention is what
+   * competes visually, and it is not the same question: see
+   * ACCESSORY_FOCAL_WEIGHT for why counting objects got both halves wrong.
    */
   const takenPositions = new Set(
     chosen
@@ -319,16 +321,27 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
       .map((item) => accessoryPosition(item.category)),
   );
 
+  // A headband is competing with the hat, not with the other accessories.
+  // Nothing else in the wardrobe crosses slots like this, so it is stated here
+  // rather than folded into the position table, which would then be lying.
+  if (chosen.some((item) => slotOf(item.category) === 'headwear')) takenPositions.add('head');
+
+  let focal = chosen
+    .filter((item) => slotOf(item.category) === 'accessory')
+    .reduce((total, item) => total + accessoryFocalWeight(item.category), 0);
+
   scored
     .filter((entry) => slotOf(entry.item.category) === 'accessory' && !used.has(entry.item.id))
     .sort((a, b) => b.score - a.score)
     .forEach((entry) => {
-      if (chosen.filter((item) => slotOf(item.category) === 'accessory').length >= MAX_ACCESSORIES) {
-        return;
-      }
       const position = accessoryPosition(entry.item.category);
       if (takenPositions.has(position)) return;
+      // Skipping one that will not fit leaves the budget open for a quieter
+      // piece further down, which is how a belt survives a statement necklace.
+      const weight = accessoryFocalWeight(entry.item.category);
+      if (focal + weight > ACCESSORY_FOCAL_BUDGET) return;
       takenPositions.add(position);
+      focal += weight;
       take(entry.item);
     });
 

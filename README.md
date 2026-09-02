@@ -360,11 +360,25 @@ Three consequences, all of which were bugs before:
 
 - Stepping through alternatives for a watch offers watches and bracelets, not
   belts.
-- An outfit can carry several accessories at once, one per position — capped at
-  three, which is the number stylists use before pieces stop supporting an
-  outfit and start arguing with it.
+- An outfit can carry several accessories at once, one per position — up to
+  three *focal points*, which is the rule stylists actually mean. It used to be
+  a cap of three objects, and that is a different claim: a belt half-hidden
+  under a jacket spent the same allowance as a statement necklace, so a belt, a
+  watch and a pair of sunglasses filled it and the chain never came out of the
+  drawer. Now a piece somebody would comment on costs 1, a piece they would
+  register costs about a half, and a piece simply doing its job costs a
+  fraction — so an outfit can wear five things and still be quiet.
+- A headband competes with a hat rather than with the other accessories, which
+  is the one place a position crosses a slot. The engine says so out loud
+  instead of the position table pretending a beanie is jewellery.
 - The closet shelves them by position too, so a drawer of glasses, rings,
   watches and belts is browsable rather than one endless row.
+
+Twelve positions now, not seven: hair, eyes, ears, neck, lapel, wrist, fingers,
+waist, legwear, carried, hands. Earrings were missing entirely, which is a
+strange omission for the most-worn accessory in the world, and so were the
+things 2026 styling has moved to the middle of an outfit — visible socks, a
+brooch on a lapel, a scarf worn in the hair.
 
 ## Archiving, planning, remembering
 

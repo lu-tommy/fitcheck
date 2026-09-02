@@ -49,6 +49,11 @@ const SPECS: SeedSpec[] = [
   { name: 'Steel watch', category: 'watch', color: 'grey', material: 'Leather', formality: 'smart-casual', seasons: ['spring', 'summer', 'fall', 'winter'], styles: ['minimalist'], favorite: true, wearCount: 25, price: 220 },
   { name: 'Charcoal beanie', category: 'beanie', color: 'charcoal', material: 'Wool', formality: 'casual', seasons: ['winter'], styles: ['streetwear', 'casual'], wearCount: 5, price: 30 },
   { name: 'Burgundy scarf', category: 'scarf', color: 'burgundy', material: 'Wool', formality: 'casual', seasons: ['fall', 'winter'], styles: ['casual', 'minimalist'], wearCount: 3, price: 50 },
+  // Three positions the wardrobe had no way to hold until now. They are in the
+  // demo so the accessory shelves arrive with something on them.
+  { name: 'Gold hoop earrings', category: 'earrings', color: 'yellow', formality: 'smart-casual', seasons: ['spring', 'summer', 'fall', 'winter'], styles: ['minimalist', 'casual'], favorite: true, wearCount: 16, price: 65 },
+  { name: 'Cream ribbed socks', category: 'socks', color: 'cream', material: 'Cotton', formality: 'casual', seasons: ['fall', 'winter', 'spring'], styles: ['casual', 'preppy'], wearCount: 11, price: 12 },
+  { name: 'Enamel lapel pin', category: 'brooch', color: 'green', formality: 'business-casual', seasons: ['fall', 'winter', 'spring'], styles: ['vintage', 'preppy'], wearCount: 2, price: 30 },
 ];
 
 export function demoWardrobe(): NewClothingItem[] {
