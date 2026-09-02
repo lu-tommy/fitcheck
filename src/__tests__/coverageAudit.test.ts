@@ -309,3 +309,118 @@ describe('what it calls the day back to you', () => {
     expect(readIntent("I'm going to a wedding")?.colorPreference).toBeUndefined();
   });
 });
+
+/**
+ * Wardrobes that are shaped nothing like the one everything was tuned on.
+ *
+ * The engine was developed against a forty-two piece wardrobe with a good
+ * spread of formality and something for every kind of day. Most wardrobes are
+ * not that, and the failures a lopsided one produces are the ones nobody sees
+ * coming — the app quietly assuming a shirt exists, or shoes, or anything clean.
+ */
+describe('wardrobes shaped nothing like hers', () => {
+  const base = REAL_WARDROBE[0];
+  const make = (
+    id: string,
+    name: string,
+    category: ClothingItem['category'],
+    over: Partial<ClothingItem> = {},
+  ): ClothingItem => ({ ...base, id, name, category, wearCount: 10, ...over });
+
+  const dressFor = (closet: ClothingItem[], prompt: string, temperature = 16) => {
+    const intent = readIntent(prompt);
+    return buildOutfitLocally({
+      request: {
+        prompt,
+        occasion: intent?.occasion,
+        formality: intent?.formality,
+        colorPreference: intent?.colorPreference,
+        includeItemIds: [],
+        excludeItemIds: [],
+        cleanOnly: true,
+      },
+      closet,
+      weather: weather(temperature),
+      preferCategories: intent?.prefer,
+      avoidCategories: intent?.avoid,
+      preferredStyles: intent?.styles,
+      today: '2026-06-01',
+    });
+  };
+
+  const slotsOf = (closet: ClothingItem[], ids: string[]) =>
+    new Set(ids.map((id) => slotOf(closet.find((item) => item.id === id)!.category)));
+
+  /** A men's wardrobe: no dresses, no skirts, and a suit that has to work. */
+  const MENS: ClothingItem[] = [
+    make('m1', 'White oxford', 'shirt', { formality: 'business-casual' }),
+    make('m2', 'Grey tee', 'tshirt'),
+    make('m3', 'Navy suit', 'suit', { formality: 'formal' }),
+    make('m4', 'Chinos', 'chinos', { formality: 'smart-casual' }),
+    make('m5', 'Jeans', 'jeans'),
+    make('m6', 'Brogues', 'dress-shoes', { formality: 'formal' }),
+    make('m7', 'Trainers', 'sneakers'),
+    make('m8', 'Navy tie', 'tie', { formality: 'formal' }),
+    make('m9', 'Wool coat', 'coat', { formality: 'business-casual' }),
+  ];
+
+  it('dresses a wardrobe with no dresses in it', () => {
+    ['I have a job interview', "I'm going to work", 'Something for today'].forEach((prompt) => {
+      const outfit = dressFor(MENS, prompt);
+      const slots = slotsOf(MENS, outfit.itemIds);
+      const dressed = slots.has('fullbody') || (slots.has('top') && slots.has('bottom'));
+      expect(dressed, `${prompt}: not dressed`).toBe(true);
+      expect(slots.has('footwear'), `${prompt}: no shoes`).toBe(true);
+    });
+  });
+
+  it('does not put a tie on somebody for a Saturday', () => {
+    const outfit = dressFor(MENS, 'Something for today');
+    expect(outfit.itemIds, 'a tie for no reason').not.toContain('m8');
+  });
+
+  /** Eight pieces, which is what a real capsule looks like. */
+  const CAPSULE: ClothingItem[] = [
+    make('c1', 'White tee', 'tshirt'),
+    make('c2', 'Striped tee', 'tshirt'),
+    make('c3', 'Jeans', 'jeans'),
+    make('c4', 'Black trousers', 'chinos', { formality: 'smart-casual' }),
+    make('c5', 'Trainers', 'sneakers'),
+    make('c6', 'Knit', 'sweater', { formality: 'smart-casual' }),
+    make('c7', 'Jacket', 'jacket'),
+    make('c8', 'Watch', 'watch'),
+  ];
+
+  it('gets a whole outfit out of eight pieces, on every kind of day', () => {
+    ["I'm going to work", "I'm going to the gym", 'I have a date tonight', 'Something for today']
+      .forEach((prompt) => {
+        const outfit = dressFor(CAPSULE, prompt);
+        const slots = slotsOf(CAPSULE, outfit.itemIds);
+        expect(slots.has('top') && slots.has('bottom'), `${prompt}: not dressed`).toBe(true);
+        expect(slots.has('footwear'), `${prompt}: no shoes`).toBe(true);
+      });
+  });
+
+  /*
+   * cleanOnly is a hard filter, so a wardrobe with nothing clean in it has to
+   * come back saying so rather than empty-handed and silent.
+   */
+  it('says something when everything is in the wash', () => {
+    const allDirty = CAPSULE.map((item) => ({ ...item, laundry: 'dirty' as const }));
+    const outfit = dressFor(allDirty, 'Something for today');
+    expect(outfit.itemIds, 'wearing dirty clothes').toEqual([]);
+    expect(outfit.warnings ?? [], 'no warning that nothing is clean').not.toEqual([]);
+  });
+
+  it('says something when there are no shoes at all', () => {
+    const barefoot = CAPSULE.filter((item) => slotOf(item.category) !== 'footwear');
+    const outfit = dressFor(barefoot, 'Something for today');
+    expect(outfit.warnings?.join(' ') ?? '', 'sent out barefoot without a word').toMatch(/shoes/i);
+  });
+
+  it('does not fall over on a wardrobe of one garment', () => {
+    const outfit = dressFor([make('only', 'One tee', 'tshirt')], 'Something for today');
+    expect(outfit.itemIds).toEqual(['only']);
+    expect(outfit.warnings ?? []).not.toEqual([]);
+  });
+});
