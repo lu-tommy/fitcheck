@@ -815,6 +815,46 @@ not, because both are about strength rather than presence:
   colours now: asking for black is asking for *dark and neutral*, which navy and
   charcoal answer and burgundy does not, and asking for blue finds denim.
 
+## When it cannot dress you
+
+The engine only ever uses clothes you own. That promise has a corollary it was
+not honouring: sometimes the honest answer is **you do not own this**.
+
+Asked to dress for a wedding out of a casual wardrobe, it produced a white
+t-shirt with charcoal dress trousers and trainers, scored it 48 out of 100,
+called it *"something in here is fighting"* — and presented it as the answer,
+with the real problem in a warning underneath. It gave the same outfit for a job
+interview and for a funeral. An app built on *wear what you own* improvising an
+outfit it has already worked out is wrong is the one thing it must not do.
+
+So a slot is now **declined** rather than filled badly, where two conditions
+both hold: an occasion was actually named, and nothing available is within three
+formality steps of it — three being where the outfit scorer starts charging real
+points and where a person starts noticing across a room. Two steps, an Oxford
+shirt with jeans, is simply an outfit.
+
+What comes back instead names the gap and what would fill it:
+
+> **Top** — Nothing you own suits a wedding. Look for: shirt, blouse.
+> *The closest you own is your white tee.* **[Add to wishlist]**
+
+Three things keep it honest:
+
+- **Only where an occasion was named.** Somebody who has not said where they are
+  going is going about their day, and *better the wrong shoes than none* still
+  holds for an ordinary Tuesday. It stops holding at a funeral.
+- **What does work is still worn.** The dress trousers stay; it is not
+  all-or-nothing.
+- **A piece asked for by name is never declined.** Overruling a deliberate
+  choice is a different kind of wrong.
+
+The suggestions come from the occasion's own list of what belongs there — the
+wedding rule already says a shirt and a blouse suit one — rather than from a
+second table that would drift away from the first. And they are written as a
+shopping list rather than a sentence, because the category labels are a mix of
+singular and plural and any phrasing with an article produces *"a shorts or
+joggers"* for somebody to read on a Tuesday morning.
+
 ## Testing
 
 `npm test` covers the domain layer — the outfit engine's slot rules and

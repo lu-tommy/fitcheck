@@ -524,6 +524,29 @@ export interface OutfitAlternative {
   why: string;
 }
 
+/**
+ * A garment the wardrobe could not supply.
+ *
+ * An engine that only ever uses clothes you own has to be willing to say you do
+ * not own something. Otherwise the promise quietly becomes "wear the wrong
+ * thing": asked to dress for a wedding out of a casual wardrobe, it produced a
+ * white t-shirt with charcoal dress trousers and trainers, scored it 48 out of
+ * 100, called it "something in here is fighting" — and presented it as the
+ * answer anyway, with the real problem in a warning underneath.
+ *
+ * Naming what is missing is more useful than any outfit it could have improvised,
+ * and it is the one thing a wardrobe app is uniquely placed to know.
+ */
+export interface MissingPiece {
+  slot: Slot;
+  /** Why nothing already owned would do, in plain words. */
+  because: string;
+  /** What to look for. Concrete enough to shop with. */
+  suggestion: string;
+  /** Categories that would fill it, so it can go straight on the wishlist. */
+  categories: Category[];
+}
+
 export interface GeneratedOutfit {
   name: string;
   itemIds: string[];
@@ -532,6 +555,8 @@ export interface GeneratedOutfit {
   alternatives: OutfitAlternative[];
   /** Populated locally when the model references an item that no longer exists. */
   warnings?: string[];
+  /** Slots the wardrobe could not fill for this occasion. See MissingPiece. */
+  missing?: MissingPiece[];
 }
 
 export interface StylistMessage {

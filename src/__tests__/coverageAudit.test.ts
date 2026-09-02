@@ -391,14 +391,32 @@ describe('wardrobes shaped nothing like hers', () => {
     make('c8', 'Watch', 'watch'),
   ];
 
-  it('gets a whole outfit out of eight pieces, on every kind of day', () => {
+  /*
+   * Either a whole outfit, or a clear account of what is missing. Never a
+   * half-outfit with nothing said — and never dress trousers to the gym on the
+   * grounds that they were the closest thing on the rail.
+   */
+  it('gets a whole outfit out of eight pieces, or says what it is short of', () => {
     ["I'm going to work", "I'm going to the gym", 'I have a date tonight', 'Something for today']
       .forEach((prompt) => {
         const outfit = dressFor(CAPSULE, prompt);
         const slots = slotsOf(CAPSULE, outfit.itemIds);
-        expect(slots.has('top') && slots.has('bottom'), `${prompt}: not dressed`).toBe(true);
-        expect(slots.has('footwear'), `${prompt}: no shoes`).toBe(true);
+        const named = new Set((outfit.missing ?? []).map((entry) => entry.slot));
+
+        (['top', 'bottom', 'footwear'] as const).forEach((slot) => {
+          expect(
+            slots.has(slot) || named.has(slot),
+            `${prompt}: no ${slot}, and nothing said about it`,
+          ).toBe(true);
+        });
       });
+  });
+
+  it('dresses eight pieces completely on a day with no occasion attached', () => {
+    const outfit = dressFor(CAPSULE, 'Something for today');
+    const slots = slotsOf(CAPSULE, outfit.itemIds);
+    expect(slots.has('top') && slots.has('bottom') && slots.has('footwear')).toBe(true);
+    expect(outfit.missing).toBeUndefined();
   });
 
   /*

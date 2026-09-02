@@ -2,6 +2,7 @@ import type {
   Category,
   ClothingItem,
   Metal,
+  MissingPiece,
   GeneratedOutfit,
   OutfitRequest,
   Season,
@@ -17,6 +18,7 @@ import {
   ACCESSORY_FOCAL_BUDGET,
   accessoryFocalWeight,
   accessoryPosition,
+  categoryLabel,
   categoryMeta,
   formalityScore,
   isWaterproof,
@@ -504,6 +506,68 @@ function pickForSlot(
   return options[0]?.item;
 }
 
+/**
+ * The slots where wearing the wrong thing is worse than wearing nothing.
+ *
+ * A belt three steps off is not a problem anybody sees. A t-shirt at a wedding
+ * is the only thing they see.
+ */
+const DECISIVE_SLOTS: Slot[] = ['top', 'bottom', 'fullbody', 'footwear'];
+
+/**
+ * How far off a garment can be before it stops being an answer.
+ *
+ * Three steps is where the outfit scorer starts charging real points, and it is
+ * where a person starts noticing across a room. Two — an Oxford shirt with
+ * jeans — is simply an outfit.
+ */
+const TOO_FAR = 3;
+
+/**
+ * What to look for, when the wardrobe has nothing.
+ *
+ * Taken from the occasion's own list of what belongs there, which the intent
+ * rules already carry — so the suggestion for a wedding names a shirt or a
+ * blouse because the wedding rule says those are what suits it, rather than
+ * from a second table that would drift away from the first.
+ */
+const FALLBACK_SUGGESTIONS: Partial<Record<Slot, Category[]>> = {
+  top: ['shirt', 'blouse'],
+  bottom: ['dress-pants', 'chinos', 'skirt'],
+  fullbody: ['dress', 'suit'],
+  footwear: ['dress-shoes', 'loafers', 'flats'],
+};
+
+function describeMissing(
+  slot: Slot,
+  categories: Category[],
+  occasion: string | undefined,
+  had: ClothingItem | undefined,
+): MissingPiece {
+  /*
+   * Written as a shopping list rather than a sentence with the garment in it.
+   *
+   * Category labels are a mix of singular and plural — "Shirt", "Shorts",
+   * "Dress shoes" — so any phrasing that needs an article in front of one
+   * produces "a shorts or joggers" for somebody to read on a Tuesday morning.
+   * A list needs no articles and is the more useful shape anyway: it is the
+   * thing you would write down before going out.
+   */
+  const names = categories.slice(0, 3).map((category) => categoryLabel(category).toLowerCase());
+  const where = occasion ? ` ${occasion}` : ' this';
+
+  return {
+    slot,
+    categories,
+    because: had
+      ? `The closest you own is your ${had.name.toLowerCase()}.`
+      : 'There is nothing in your closet that fills this at all.',
+    suggestion: names.length
+      ? `Nothing you own suits${where}. Look for: ${names.join(', ')}.`
+      : `Nothing you own suits${where}.`,
+  };
+}
+
 export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
   const { request, closet, weather } = context;
   const temperature = weather?.temperature ?? request.temperature ?? 18;
@@ -515,6 +579,44 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
 
   const chosen: ClothingItem[] = [];
   const used = new Set<string>();
+  const missing: MissingPiece[] = [];
+
+  /*
+   * Whether a garment is close enough to the day to be worth putting on.
+   *
+   * Only ever applied where an occasion was actually named. Somebody who has
+   * not said where they are going is going about their day, and the app should
+   * dress them out of whatever is there — "better the wrong shoes than none"
+   * still holds for an ordinary Tuesday. It stops holding at a funeral.
+   */
+  const goodEnough = (item: ClothingItem): boolean => {
+    if (!request.formality) return true;
+    if (context.avoidCategories?.includes(item.category)) return false;
+    const distance = Math.abs(
+      formalityScore(item.formality) - formalityScore(request.formality),
+    );
+    return distance < TOO_FAR;
+  };
+
+  /** Take the best candidate, or decline the slot and say what would fill it. */
+  const takeDecisive = (slot: Slot) => {
+    const candidate = pickForSlot(slot, scored, chosen, used);
+    if (candidate && goodEnough(candidate)) {
+      take(candidate);
+      return;
+    }
+    const wanted = (context.preferCategories ?? []).filter(
+      (category) => slotOf(category) === slot,
+    );
+    missing.push(
+      describeMissing(
+        slot,
+        wanted.length ? wanted : (FALLBACK_SUGGESTIONS[slot] ?? []),
+        request.occasion,
+        candidate,
+      ),
+    );
+  };
 
   const take = (item?: ClothingItem) => {
     if (!item || used.has(item.id)) return;
@@ -553,17 +655,11 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
   if (useFullbody) {
     take(forcedFullbody ?? bestFullbody?.item);
   } else {
-    if (!chosen.some((item) => slotOf(item.category) === 'top')) {
-      take(pickForSlot('top', scored, chosen, used));
-    }
-    if (!chosen.some((item) => slotOf(item.category) === 'bottom')) {
-      take(pickForSlot('bottom', scored, chosen, used));
-    }
+    if (!chosen.some((item) => slotOf(item.category) === 'top')) takeDecisive('top');
+    if (!chosen.some((item) => slotOf(item.category) === 'bottom')) takeDecisive('bottom');
   }
 
-  if (!chosen.some((item) => slotOf(item.category) === 'footwear')) {
-    take(pickForSlot('footwear', scored, chosen, used));
-  }
+  if (!chosen.some((item) => slotOf(item.category) === 'footwear')) takeDecisive('footwear');
 
   // Layer up until the outfit is warm enough for the forecast.
   const warmthOf = (items: ClothingItem[]) =>
@@ -766,6 +862,7 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
     colorNotes: harmony.summary,
     alternatives,
     warnings: missingSlotWarnings(chosen, context.avoidCategories),
+    missing: missing.length ? missing : undefined,
   };
 }
 

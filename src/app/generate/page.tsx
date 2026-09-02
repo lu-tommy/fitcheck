@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 
 import { ItemTile } from '@/components/closet/ItemTile';
+import { MissingPieces } from '@/components/outfit/MissingPieces';
 import { OutfitCollage } from '@/components/outfit/OutfitCollage';
 import { OutfitStack } from '@/components/outfit/OutfitStack';
 import { PageHeader } from '@/components/PageHeader';
@@ -340,6 +341,18 @@ function Generator() {
               />
             </>
           )}
+
+          {/*
+            * Directly under the outfit, and above "why this works", because it
+            * is the more important of the two: an outfit built out of four
+            * pieces when the day needs six is not explained by the four.
+            */}
+          {!rival && result.outfit.missing?.length ? (
+            <MissingPieces
+              missing={result.outfit.missing}
+              occasion={occasion ?? intent?.occasion}
+            />
+          ) : null}
 
           {!rival && result.outfit.warnings?.length ? (
             <div className="rounded-2xl bg-[var(--warning-soft)] p-3 text-[0.8125rem] text-[var(--warning)]">

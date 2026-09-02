@@ -135,7 +135,14 @@ describe('the clothes actually change', () => {
     expect(dressFor('going hiking this weekend').ids).toContain('boots');
   });
 
-  it('still dresses you when the wardrobe cannot cover the occasion', () => {
+  /*
+   * This test used to assert the opposite: that it dressed you anyway, in an
+   * Oxford shirt and dress shoes, to go for a run — and buried the truth in a
+   * warning underneath. Improvising an outfit it has already worked out is
+   * wrong is the one thing an app built on "wear what you own" must not do.
+   * Naming what is missing is both more honest and more useful.
+   */
+  it('says what is missing rather than improvising, when the wardrobe cannot cover it', () => {
     // Nothing athletic at all — office clothes and nothing else.
     const officeOnly = [
       makeItem({ id: 'shirt', category: 'shirt', name: 'Oxford shirt', primaryColor: 'light blue' }),
@@ -143,9 +150,17 @@ describe('the clothes actually change', () => {
       makeItem({ id: 'derbies', category: 'dress-shoes', name: 'Black derbies', primaryColor: 'black' }),
     ];
     const { outfit, ids } = dressFor('going for a run', officeOnly);
-    expect(ids).toHaveLength(3);
-    // And it admits the wardrobe was the limit rather than pretending.
-    expect(outfit.warnings?.join(' ')).toMatch(/do not own anything better suited/i);
+
+    expect(ids, 'dress shoes for a run').not.toContain('derbies');
+    expect(ids, 'dress trousers for a run').not.toContain('trousers');
+
+    // All three, because an office wardrobe has nothing for a run — not a top,
+    // not a bottom, not shoes. Saying so is the whole answer.
+    const missing = outfit.missing ?? [];
+    expect(missing.map((entry) => entry.slot).sort()).toEqual(['bottom', 'footwear', 'top']);
+    expect(missing.find((entry) => entry.slot === 'footwear')!.categories).toContain('sneakers');
+    expect(missing.find((entry) => entry.slot === 'top')!.suggestion).toMatch(/t-shirt|tank/i);
+    expect(ids, 'wore the office anyway').toEqual([]);
   });
 
   it('leaves an unrecognised sentence to the ordinary engine', () => {
