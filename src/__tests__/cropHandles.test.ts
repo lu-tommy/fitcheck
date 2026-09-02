@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { clampPan, draw, resize } from '@/components/closet/MultiCrop';
-import { CROP_ASPECT, MIN_BOX, cropFrame, isDrawnBox } from '@/lib/crop';
+import {
+  CROP_ASPECT,
+  MIN_BOX,
+  cropFrame,
+  isDrawnBox,
+  rotateBox,
+  rotatedExtent,
+} from '@/lib/crop';
 
 const box = { id: 'b', x: 0.2, y: 0.2, width: 0.4, height: 0.4 };
 
@@ -211,5 +218,138 @@ describe('clampPan', () => {
   it('pins a photo that fits, because there is nowhere to go', () => {
     expect(clampPan(400, 300, 90)).toBe(0);
     expect(clampPan(400, 0, 90)).toBe(0);
+  });
+});
+
+/**
+ * Turning the photo.
+ *
+ * The crop is exactly the box that was drawn, and it is an axis-aligned box —
+ * which is the one thing careful handles cannot fix. A jumper photographed at a
+ * tilt does not fit in an upright rectangle, so framing it meant drawing a
+ * bigger box and taking the wall back in. The photo has to turn.
+ */
+describe('rotatedExtent', () => {
+  it('swaps the sides on a quarter turn', () => {
+    expect(rotatedExtent(400, 300, 90)).toEqual({ width: 300, height: 400 });
+    expect(rotatedExtent(400, 300, -90)).toEqual({ width: 300, height: 400 });
+  });
+
+  it('leaves a photo alone when nothing turns', () => {
+    expect(rotatedExtent(400, 300, 0)).toEqual({ width: 400, height: 300 });
+    expect(rotatedExtent(400, 300, 180)).toEqual({ width: 400, height: 300 });
+  });
+
+  it('grows to hold the corners a straighten opens up', () => {
+    const tilted = rotatedExtent(400, 300, 10);
+    expect(tilted.width).toBeGreaterThan(400);
+    expect(tilted.height).toBeGreaterThan(300);
+    // But only by a little — this is a straighten, not a quarter turn.
+    expect(tilted.width).toBeLessThan(460);
+  });
+});
+
+describe('rotateBox', () => {
+  const square = { id: 'b', x: 0.25, y: 0.25, width: 0.5, height: 0.5 };
+
+  it('carries a centred box through a quarter turn unchanged', () => {
+    const turned = rotateBox(square, 90, 400, 400);
+    expect(turned.x).toBeCloseTo(0.25, 3);
+    expect(turned.y).toBeCloseTo(0.25, 3);
+    expect(turned.width).toBeCloseTo(0.5, 3);
+    expect(turned.height).toBeCloseTo(0.5, 3);
+  });
+
+  it('takes a corner box to the corner a quarter turn puts it in', () => {
+    // Top-left of an upright photo becomes top-right after a clockwise turn.
+    const corner = { id: 'b', x: 0, y: 0, width: 0.25, height: 0.25 };
+    const turned = rotateBox(corner, 90, 400, 400);
+    expect(turned.x).toBeCloseTo(0.75, 3);
+    expect(turned.y).toBeCloseTo(0, 3);
+  });
+
+  it('follows the photo changing shape, not just the box', () => {
+    // A box filling the left half of a 400x200 photo fills the top half of the
+    // 200x400 one it becomes.
+    const half = { id: 'b', x: 0, y: 0, width: 0.5, height: 1 };
+    const turned = rotateBox(half, 90, 400, 200);
+    expect(turned.height).toBeCloseTo(0.5, 3);
+    expect(turned.width).toBeCloseTo(1, 3);
+  });
+
+  /*
+   * The invariant that actually matters, and the reason a straighten is safe:
+   * everything inside the box before the turn is inside it afterwards. The box
+   * may come out a little generous — a tilted rectangle does not fit inside an
+   * upright one — and that is the right way round. A box that clipped the
+   * garment is the bug this guards, and it would be invisible until somebody
+   * looked at a hem that had lost its corner.
+   */
+  it('still contains everything it contained before the turn', () => {
+    const box = { id: 'b', x: 0.1, y: 0.15, width: 0.6, height: 0.2 };
+    const width = 400;
+    const height = 300;
+    const degrees = 8;
+    const radians = (degrees * Math.PI) / 180;
+    const turned = rotateBox(box, degrees, width, height);
+    const target = rotatedExtent(width, height, degrees);
+
+    [0, 0.5, 1].forEach((fx) => {
+      [0, 0.5, 1].forEach((fy) => {
+        const px = (box.x + box.width * fx) * width - width / 2;
+        const py = (box.y + box.height * fy) * height - height / 2;
+        const rx =
+          (px * Math.cos(radians) - py * Math.sin(radians) + target.width / 2) / target.width;
+        const ry =
+          (px * Math.sin(radians) + py * Math.cos(radians) + target.height / 2) / target.height;
+        expect(rx).toBeGreaterThanOrEqual(turned.x - 1e-6);
+        expect(rx).toBeLessThanOrEqual(turned.x + turned.width + 1e-6);
+        expect(ry).toBeGreaterThanOrEqual(turned.y - 1e-6);
+        expect(ry).toBeLessThanOrEqual(turned.y + turned.height + 1e-6);
+      });
+    });
+  });
+
+  /*
+   * In FRACTIONS a straightened box can come out smaller, because the canvas
+   * grew to hold the opened corners and grew faster than the box did. In pixels
+   * it never does, and pixels are what the crop reads.
+   */
+  it('never loses area in pixels, however the canvas changes shape', () => {
+    const box = { id: 'b', x: 0.2, y: 0.3, width: 0.5, height: 0.2 };
+    const width = 400;
+    const height = 300;
+    const before = box.width * width * (box.height * height);
+
+    const turned = rotateBox(box, 8, width, height);
+    const target = rotatedExtent(width, height, 8);
+    const after = turned.width * target.width * (turned.height * target.height);
+
+    expect(after).toBeGreaterThanOrEqual(before - 1);
+  });
+
+  it('never lets a turned box leave the photograph', () => {
+    [90, -90, 12, -12, 180].forEach((degrees) => {
+      const edge = { id: 'b', x: 0.8, y: 0.8, width: 0.2, height: 0.2 };
+      const turned = rotateBox(edge, degrees, 400, 300);
+      expect(turned.x).toBeGreaterThanOrEqual(0);
+      expect(turned.y).toBeGreaterThanOrEqual(0);
+      expect(turned.x + turned.width).toBeLessThanOrEqual(1.0001);
+      expect(turned.y + turned.height).toBeLessThanOrEqual(1.0001);
+    });
+  });
+
+  it('comes back to where it started after four quarter turns', () => {
+    let box = { id: 'b', x: 0.1, y: 0.2, width: 0.3, height: 0.4 };
+    let width = 400;
+    let height = 300;
+    for (let i = 0; i < 4; i += 1) {
+      box = rotateBox(box, 90, width, height);
+      [width, height] = [height, width];
+    }
+    expect(box.x).toBeCloseTo(0.1, 3);
+    expect(box.y).toBeCloseTo(0.2, 3);
+    expect(box.width).toBeCloseTo(0.3, 3);
+    expect(box.height).toBeCloseTo(0.4, 3);
   });
 });

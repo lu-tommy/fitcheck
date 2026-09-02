@@ -1,10 +1,29 @@
 'use client';
 
-import { Crop, Hand, Maximize2, Minus, Plus, Sparkles, Trash2, Undo2, X } from 'lucide-react';
+import {
+  Crop,
+  Hand,
+  Maximize2,
+  Minus,
+  Plus,
+  RotateCw,
+  Sparkles,
+  Trash2,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
-import { MIN_BOX, MIN_DRAG_PX, isDrawnBox, normaliseBox, type CropBox } from '@/lib/crop';
+import {
+  MIN_BOX,
+  MIN_DRAG_PX,
+  isDrawnBox,
+  normaliseBox,
+  rotateBox,
+  rotateImage,
+  type CropBox,
+} from '@/lib/crop';
 import { PARSE_CONFIDENT } from '@/domain/garmentClasses';
 import { categoryLabel } from '@/domain/taxonomy';
 import { MODEL_SIZE_MB, parseGarments, type ParseProgress } from '@/lib/garmentParsing';
@@ -118,8 +137,21 @@ export function MultiCrop({
 }: {
   file: Blob;
   onCancel: () => void;
-  onConfirm: (boxes: DrawnBox[]) => void;
+  /** The boxes, and the image they are boxes of — which turning changes. */
+  onConfirm: (boxes: DrawnBox[], source: Blob) => void;
 }) {
+  /*
+   * The photo as it currently stands.
+   *
+   * Turning rewrites this rather than layering a transform over the top, so
+   * every other thing on this screen — the boxes, the crop, the loupe, the
+   * parser — goes on believing it is looking at an ordinary upright photograph.
+   * None of them had to learn about rotation, which is the whole reason it is
+   * done this way.
+   */
+  const [working, setWorking] = useState<Blob>(file);
+  const [straighten, setStraighten] = useState(0);
+  const [turning, setTurning] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
   const [image, setImage] = useState({ width: 0, height: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -158,6 +190,35 @@ export function MultiCrop({
   const [parsing, setParsing] = useState<ParseProgress | null>(null);
   const [parseNote, setParseNote] = useState<string | null>(null);
 
+  /**
+   * Turn the photo, and carry the boxes with it.
+   *
+   * A quarter turn is exact. A straighten of a few degrees grows each box very
+   * slightly — a tilted rectangle does not fit inside an upright one — which is
+   * the honest trade, and is why this sits next to the shape row where it is
+   * found before there is anything to box rather than after.
+   */
+  async function turn(degrees: number) {
+    if (turning || !degrees) return;
+    setTurning(true);
+    try {
+      const rotated = await rotateImage(working, degrees);
+      setBoxes((current) =>
+        current.map((box) => ({
+          ...box,
+          ...rotateBox(box, degrees, image.width, image.height),
+        })),
+      );
+      setWorking(rotated);
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    } catch {
+      setParseNote('This browser could not turn the photo.');
+    } finally {
+      setTurning(false);
+    }
+  }
+
   async function findGarments() {
     if (parsing) return;
     if (consent !== 'on') {
@@ -168,7 +229,7 @@ export function MultiCrop({
     setParseNote(null);
     setParsing({ downloaded: 0, message: 'Getting ready…' });
 
-    const outcome = await parseGarments(file, setParsing);
+    const outcome = await parseGarments(working, setParsing);
     setParsing(null);
 
     if (!outcome.ok) {
@@ -199,10 +260,10 @@ export function MultiCrop({
 
 
   useEffect(() => {
-    const objectUrl = URL.createObjectURL(file);
+    const objectUrl = URL.createObjectURL(working);
     setUrl(objectUrl);
     let cancelled = false;
-    void createImageBitmap(file, { imageOrientation: 'from-image' }).then((bitmap) => {
+    void createImageBitmap(working, { imageOrientation: 'from-image' }).then((bitmap) => {
       if (!cancelled) setImage({ width: bitmap.width, height: bitmap.height });
       bitmap.close();
     });
@@ -210,7 +271,7 @@ export function MultiCrop({
       cancelled = true;
       URL.revokeObjectURL(objectUrl);
     };
-  }, [file]);
+  }, [working]);
 
   useLayoutEffect(() => {
     const node = frame.current;
@@ -451,6 +512,14 @@ export function MultiCrop({
     (box) => box.id !== drawingId || isDrawnBox(box, displayWidth, displayHeight),
   );
   const selected = ready.find((box) => box.id === active) ?? null;
+  /**
+   * Tidy the geometry and keep everything else.
+   *
+   * `normaliseBox` returns a bare CropBox, so mapping the list through it threw
+   * away the very thing a parsed box exists to carry.
+   */
+  const withGeometry = (box: DrawnBox): DrawnBox => ({ ...box, ...normaliseBox(box) });
+
   const toScreen = (box: CropBox) => ({
     left: originX + box.x * displayWidth,
     top: originY + box.y * displayHeight,
@@ -804,6 +873,53 @@ export function MultiCrop({
           </Button>
         ) : null}
 
+        {/*
+          * Turning sits above the shape row because it is a decision about the
+          * photograph, and the shapes are a decision about a box. An axis-aligned
+          * crop cannot rescue a tilted garment however carefully it is drawn —
+          * the only thing that can is turning the photo underneath it.
+          */}
+        <div className="mb-2.5 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void turn(90)}
+            disabled={turning}
+            aria-label="Turn a quarter turn"
+            className="pressable grid size-9 shrink-0 place-items-center rounded-full bg-[var(--surface-alt)] disabled:opacity-50"
+          >
+            <RotateCw size={16} />
+          </button>
+          <label className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="sr-only">Straighten</span>
+            <input
+              type="range"
+              min={-15}
+              max={15}
+              step={1}
+              value={straighten}
+              disabled={turning}
+              onChange={(event) => setStraighten(Number(event.target.value))}
+              // Committing on release, not on every step: each one repaints the
+              // whole photo, and a slider that re-renders a 12-megapixel image
+              // sixty times on the way past is a slider nobody can hold.
+              onPointerUp={() => {
+                if (!straighten) return;
+                void turn(straighten);
+                setStraighten(0);
+              }}
+              onKeyUp={(event) => {
+                if (event.key !== 'Enter' || !straighten) return;
+                void turn(straighten);
+                setStraighten(0);
+              }}
+              className="min-w-0 flex-1 accent-[var(--brand)]"
+            />
+            <span className="w-10 shrink-0 text-right text-[0.75rem] tabular-nums text-[var(--text-muted)]">
+              {straighten > 0 ? `+${straighten}` : straighten}°
+            </span>
+          </label>
+        </div>
+
         <div className="mb-2.5 flex gap-1.5 rounded-full bg-[var(--surface-alt)] p-1">
           {SHAPES.map((option) => (
             <button
@@ -860,7 +976,7 @@ export function MultiCrop({
           full
           size="lg"
           disabled={!ready.length}
-          onClick={() => onConfirm(ready.map(normaliseBox))}
+          onClick={() => onConfirm(ready.map(withGeometry), working)}
         >
           {ready.length ? `Add ${pluralize(ready.length, 'piece')}` : 'Draw a box to start'}
         </Button>

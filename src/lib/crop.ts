@@ -220,3 +220,125 @@ async function borderColor(source: ImageBitmap, box: CropBox): Promise<string> {
   if (!count) return '#f2eee9';
   return `rgb(${Math.round(r / count)}, ${Math.round(g / count)}, ${Math.round(b / count)})`;
 }
+
+/* ------------------------------------------------------------- rotation -- */
+
+/**
+ * Turning the photo, before anything is boxed.
+ *
+ * The crop is exactly the box that was drawn — that promise is the reason this
+ * screen exists — and it is an axis-aligned box, which is the one thing it
+ * cannot do anything about. A jumper photographed at a tilt does not fit in an
+ * upright rectangle, so the only way to frame it was to draw a bigger box and
+ * take the wall back in with it. No amount of care with the handles beats the
+ * geometry; the photo has to turn.
+ *
+ * Rotation therefore rewrites the working image rather than being a layer over
+ * the top of it. Everything downstream — the boxes, the crop, the colour
+ * detection, the cut-out — then goes on believing it is looking at an ordinary
+ * upright photograph, which is why none of it had to change.
+ */
+
+/** The size of the upright box a rotated image needs. */
+export function rotatedExtent(
+  width: number,
+  height: number,
+  degrees: number,
+): { width: number; height: number } {
+  const radians = (degrees * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(radians));
+  const sin = Math.abs(Math.sin(radians));
+  return {
+    width: Math.max(1, Math.round(width * cos + height * sin)),
+    height: Math.max(1, Math.round(width * sin + height * cos)),
+  };
+}
+
+/**
+ * Where a box lands once the photo underneath it has turned.
+ *
+ * The four corners are carried through the rotation and an upright box is taken
+ * around where they end up, so whatever was inside the box before the turn is
+ * inside it afterwards. At ninety degrees that is exact. At five it is slightly
+ * generous in pixels — a tilted rectangle does not fit in an upright one — and
+ * generous is the right way round: a box that clipped a hem would not be
+ * noticed until somebody looked at the finished tile.
+ *
+ * As a FRACTION the box can come out smaller, because the canvas grew to hold
+ * the corners the turn opened up and grew faster than the box did. Nothing is
+ * lost; the frame around it simply got bigger.
+ */
+export function rotateBox(
+  box: CropBox,
+  degrees: number,
+  sourceWidth: number,
+  sourceHeight: number,
+): CropBox {
+  const safe = normaliseBox(box);
+  const radians = (degrees * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const target = rotatedExtent(sourceWidth, sourceHeight, degrees);
+
+  const corners = [
+    [safe.x, safe.y],
+    [safe.x + safe.width, safe.y],
+    [safe.x + safe.width, safe.y + safe.height],
+    [safe.x, safe.y + safe.height],
+  ].map(([fx, fy]) => {
+    const dx = fx * sourceWidth - sourceWidth / 2;
+    const dy = fy * sourceHeight - sourceHeight / 2;
+    return [
+      (dx * cos - dy * sin + target.width / 2) / target.width,
+      (dx * sin + dy * cos + target.height / 2) / target.height,
+    ];
+  });
+
+  const xs = corners.map(([x]) => x);
+  const ys = corners.map(([, y]) => y);
+  const left = clamp(Math.min(...xs));
+  const top = clamp(Math.min(...ys));
+
+  return {
+    id: box.id,
+    x: left,
+    y: top,
+    width: Math.min(1 - left, clamp(Math.max(...xs)) - left),
+    height: Math.min(1 - top, clamp(Math.max(...ys)) - top),
+  };
+}
+
+/**
+ * Paint the photo onto a canvas turned by `degrees`.
+ *
+ * The corners a straighten opens up are filled with the photo's own border
+ * colour rather than left black, for the same reason the crop pads that way:
+ * a black wedge reads as damage, and a plausible backdrop reads as framing.
+ */
+export async function rotateImage(source: Blob, degrees: number): Promise<Blob> {
+  const bitmap = await createImageBitmap(source, { imageOrientation: 'from-image' });
+  const target = rotatedExtent(bitmap.width, bitmap.height, degrees);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = target.width;
+  canvas.height = target.height;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    bitmap.close();
+    throw new Error('This browser cannot rotate images');
+  }
+
+  context.fillStyle = await borderColor(bitmap, { id: 'whole', x: 0, y: 0, width: 1, height: 1 });
+  context.fillRect(0, 0, target.width, target.height);
+
+  context.translate(target.width / 2, target.height / 2);
+  context.rotate((degrees * Math.PI) / 180);
+  context.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
+  bitmap.close();
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, 'image/jpeg', 0.92),
+  );
+  if (!blob) throw new Error('Could not turn the photo');
+  return blob;
+}

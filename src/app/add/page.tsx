@@ -724,7 +724,9 @@ export default function AddPage() {
         <MultiCrop
           file={cropSource}
           onCancel={() => setCropSource(null)}
-          onConfirm={(boxes) => void ingestCrops(cropSource, boxes)}
+          // The source comes back from the cropper, because straightening the
+          // photo replaces it and the boxes belong to the turned one.
+          onConfirm={(boxes, source) => void ingestCrops(source, boxes)}
         />
       ) : null}
 

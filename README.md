@@ -274,6 +274,20 @@ piece, what is under it and what the weather is doing, which is enough for
 "Cream over indigo", "Navy under the olive" or "Charcoal, wrapped up". Still
 deterministic: same closet, same day, same name.
 
+### Turning the photo
+
+The crop is exactly the box that was drawn, and it is an *axis-aligned* box —
+which is the one thing careful handles cannot fix. A jumper photographed at a
+tilt does not fit inside an upright rectangle, so framing it meant drawing a
+bigger box and taking the wall back in with it.
+
+So the photo turns: a quarter-turn button and a ±15° straighten. Rotation
+rewrites the working image rather than layering a transform over the top, which
+is why nothing downstream — the boxes, the crop, the colour detection, the
+cut-out, the parser — had to learn about it. Boxes are carried through with it,
+exactly on a quarter turn and slightly generously on a straighten, because a box
+that clipped a hem would not be noticed until somebody looked at the tile.
+
 ## Finding the clothes
 
 Point it at a photo of somebody wearing an outfit and it boxes and names every
