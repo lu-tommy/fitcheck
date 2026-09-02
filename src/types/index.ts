@@ -298,6 +298,41 @@ export interface Outfit {
   updatedAt: string;
 }
 
+/**
+ * One thing the wearer did that says something about what they like.
+ *
+ * The app had exactly one source of preference — `favorite`, a flag almost
+ * nobody sets — and one source of history, the wear log, which it used only as
+ * a penalty to stop the same three pieces coming up every day. Everything else
+ * was thrown away: the strongest signal in the whole product is somebody being
+ * offered a garment for a slot and deliberately walking to a different one, and
+ * that happened on the home screen several times a week and was never written
+ * down.
+ *
+ * Deliberately NOT recorded: shuffling past an outfit. That means "not today",
+ * not "not ever", and treating the two the same would teach the app to hide
+ * clothes somebody likes for reasons it invented.
+ */
+export type SignalKind =
+  /** Offered for a slot and swapped away from. */
+  | 'passed'
+  /** Swapped TO — a direct comparison, and the strongest signal there is. */
+  | 'chosen'
+  /** Actually worn, and logged. */
+  | 'worn';
+
+export interface StyleSignal {
+  id: string;
+  itemId: string;
+  kind: SignalKind;
+  /** The other side of a swap, when there was one. */
+  againstItemId?: string;
+  /** YYYY-MM-DD, local — signals decay, so when matters. */
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** A record of an outfit actually being worn. Drives history and stats. */
 export interface WearLog {
   id: string;
@@ -389,6 +424,11 @@ export interface Preferences {
    * whoever is looking at it. See domain/ootd.
    */
   outfitOfTheDay?: { date: string; itemIds: string[] };
+  /**
+   * Observations the wearer has told the app it has wrong. Keys, not text, so
+   * a dismissal survives the wording being improved.
+   */
+  dismissedObservations?: string[];
 }
 
 /**
@@ -477,7 +517,14 @@ export interface PackingRequest {
 /* ------------------------------------------------------------------ sync -- */
 
 /** The collections that synchronise. Photos and settings travel separately. */
-export type SyncedStore = 'items' | 'outfits' | 'wearLogs' | 'calendar' | 'packing' | 'wishlist';
+export type SyncedStore =
+  | 'items'
+  | 'outfits'
+  | 'wearLogs'
+  | 'calendar'
+  | 'packing'
+  | 'wishlist'
+  | 'signals';
 
 /**
  * A record of something being deleted.

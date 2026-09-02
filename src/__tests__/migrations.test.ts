@@ -121,7 +121,7 @@ describe('migrations', () => {
     const database = await openCurrent();
     expect([...database.objectStoreNames].sort()).toEqual([
       'calendar', 'deletions', 'items', 'meta', 'outfits',
-      'packing', 'photos', 'wearLogs', 'wishlist',
+      'packing', 'photos', 'signals', 'wearLogs', 'wishlist',
     ]);
     database.close();
   });

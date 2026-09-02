@@ -26,6 +26,7 @@ import { Button, ButtonLink } from '@/components/ui/Button';
 import { EmptyState, SectionHeader } from '@/components/ui/Feedback';
 import { scoreOutfit } from '@/domain/fitScore';
 import { pinIsUsable, pinMatches } from '@/domain/ootd';
+import { readTaste } from '@/domain/taste';
 import { buildOutfitLocally, cycleSlot, slotAlternatives } from '@/domain/outfitEngine';
 import { demoWardrobe } from '@/domain/seed';
 import { putPhoto } from '@/db';
@@ -38,6 +39,7 @@ import { weatherKind } from '@/lib/weather';
 import { pluralize } from '@/lib/format';
 import { useActiveItems, useCloset, useResolvedItems } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
+import { useTaste } from '@/store/taste';
 import { usePlanner } from '@/store/planner';
 import { usePreferences } from '@/store/preferences';
 import { toast } from '@/store/toast';
@@ -53,6 +55,9 @@ export default function HomePage() {
   const preferences = usePreferences((state) => state.preferences);
   const updatePreferences = usePreferences((state) => state.update);
   const weather = useWeather((state) => state.snapshot);
+  const signals = useTaste((state) => state.signals);
+  const recordSignal = useTaste((state) => state.record);
+  const recordWorn = useTaste((state) => state.recordWorn);
   const [loadingDemo, setLoadingDemo] = useState(false);
   /*
    * The greeting and the date are the only things on this screen that depend on
@@ -94,6 +99,11 @@ export default function HomePage() {
    * colour notes all describe what is on screen — see domain/ootd for why an
    * outfit with a name must not change between breakfast and the front door.
    */
+  const taste = useMemo(
+    () => readTaste(signals, items, wearLogs, today, preferences.dismissedObservations),
+    [signals, items, wearLogs, today, preferences.dismissedObservations],
+  );
+
   const wearable = useMemo(() => items.filter((item) => item.laundry === 'clean'), [items]);
   const pin = preferences.outfitOfTheDay;
   const pinned = pinIsUsable(pin, today, wearable) ? pin!.itemIds : null;
@@ -116,6 +126,7 @@ export default function HomePage() {
       avoidColors: preferences.avoidColors,
       units: preferences.units,
       restingItemIds: seen,
+      affinity: taste.affinity,
     });
   }, [
     items,
@@ -127,6 +138,7 @@ export default function HomePage() {
     wornToday,
     pinned?.join(','),
     seen,
+    taste.affinity,
   ]);
 
   /*
@@ -152,8 +164,16 @@ export default function HomePage() {
       preferredStyles: preferences.preferredStyles,
       avoidColors: preferences.avoidColors,
       units: preferences.units,
+      affinity: taste.affinity,
     }),
-    [items, weather, preferences.preferredStyles, preferences.avoidColors, preferences.units],
+    [
+      items,
+      weather,
+      preferences.preferredStyles,
+      preferences.avoidColors,
+      preferences.units,
+      taste.affinity,
+    ],
   );
 
   // A fresh suggestion replaces anything swapped by hand.
@@ -193,12 +213,21 @@ export default function HomePage() {
     [suggestionItems],
   );
 
+  /*
+   * Swapping is the strongest preference signal in the whole product — you were
+   * shown one garment for that slot and deliberately walked to another — and it
+   * used to be thrown away the moment the arrow was tapped.
+   */
   const cycle = (item: ClothingItem, direction: 1 | -1) => {
-    const next = cycleSlot(engineContext, shownIds ?? [], item.id, direction);
-    if (next.join(',') === (shownIds ?? []).join(',')) {
+    const current = shownIds ?? [];
+    const next = cycleSlot(engineContext, current, item.id, direction);
+    if (next.join(',') === current.join(',')) {
       toast('Nothing else in your closet fits that slot');
       return;
     }
+    const arrived = next.find((id) => !current.includes(id));
+    void recordSignal(item.id, 'passed', arrived);
+    if (arrived) void recordSignal(arrived, 'chosen', item.id);
     setSwappedIds(next);
   };
   const wornItems = useResolvedItems(wornToday?.itemIds);
@@ -255,6 +284,7 @@ export default function HomePage() {
       occasion: 'Today',
     });
     await wearOutfit(outfit.id);
+    void recordWorn(shownIds ?? suggestion.itemIds);
     toast('That is today sorted', { tone: 'success' });
   }
 

@@ -43,6 +43,7 @@ export const SYNCED_STORES: SyncedStore[] = [
   'calendar',
   'packing',
   'wishlist',
+  'signals',
 ];
 
 export type SyncMode =

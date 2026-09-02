@@ -6,6 +6,7 @@ import type {
   Outfit,
   PackingList,
   Preferences,
+  StyleSignal,
   StylistMessage,
   SyncState,
   Tombstone,
@@ -62,6 +63,11 @@ export interface FitCheckDB extends DBSchema {
     key: string;
     value: WishlistItem;
     indexes: { createdAt: string };
+  };
+  signals: {
+    key: string;
+    value: StyleSignal;
+    indexes: { date: string; itemId: string };
   };
   photos: {
     key: string;

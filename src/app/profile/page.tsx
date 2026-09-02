@@ -25,6 +25,7 @@ import { SyncStatus } from '@/components/SyncStatus';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { SectionHeader } from '@/components/ui/Feedback';
+import { TasteCard } from '@/components/TasteCard';
 import { Field, Input, Switch } from '@/components/ui/Field';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Sheet } from '@/components/ui/Sheet';
@@ -234,6 +235,16 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/*
+          * Sits under Styling on purpose: the two things above are what you
+          * told it, and this is what it worked out on its own. Directly next to
+          * each other, because one has to be as easy to overrule as the other.
+          */}
+        <section>
+          <SectionHeader title="What it has learned" />
+          <TasteCard />
         </section>
 
         <section>

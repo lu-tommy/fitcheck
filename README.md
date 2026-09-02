@@ -332,6 +332,37 @@ That needed three facts the wardrobe never held: `fit`, `length` and `rise`, plu
 only offered on a garment that can answer it — a pair of sunglasses is never
 asked how it is cut.
 
+## What it learns about you
+
+Every wardrobe app claims to learn your style and almost none can tell you what
+they learned, because the answer is a vector. This one is a tally.
+
+The strongest preference signal in the whole product is somebody being offered a
+garment for a slot and deliberately walking to a different one — and that
+happened on the home screen several times a week and was thrown away. It is
+written down now, alongside what was actually worn, weighted, decayed on a
+sixty-day half-life, and turned into sentences on **You → What it has learned**:
+
+> **You keep putting the olive field jacket back.**
+> Offered 7 times, and swapped away from 5 of them. *[Archive it] [That is wrong]*
+
+Four rules hold this honest, and they are the feature:
+
+- **It never states an opinion it cannot evidence.** An observation needs a
+  minimum number of occasions before it is offered at all, and always shows the
+  count it rests on. One avoided olive jacket is a fact about a jacket — it
+  takes two garments before it will say anything about *olive*.
+- **It suggests, and never acts.** Nothing is archived, favourited or added to
+  the avoid list except by a tap. The engine nudge is smaller than the colours
+  you told it to avoid, and it cannot put a dirty shirt back on you or a blazer
+  on you for the gym. Those are facts; this is an inference drawn from a few taps.
+- **Everything is forgettable.** "That is wrong" unlearns the pieces the
+  sentence was about, not just the sentence — hiding the words while the engine
+  quietly kept acting on them is the exact failure the screen exists to prevent.
+- **Shuffling past an outfit is not recorded at all.** That means *not today*,
+  not *not ever*, and treating them the same teaches the app to hide clothes
+  somebody likes for reasons it invented.
+
 ## Care instructions
 
 Each item can carry its label — wash, cycle, dry, iron, bleach, plus the short

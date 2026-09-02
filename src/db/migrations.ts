@@ -81,6 +81,16 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 3,
+    describe: 'style signals — what the wearer reaches for',
+    run(database) {
+      if (database.objectStoreNames.contains('signals')) return;
+      const signals = database.createObjectStore('signals', { keyPath: 'id' });
+      signals.createIndex('date', 'date');
+      signals.createIndex('itemId', 'itemId');
+    },
+  },
 ];
 
 /** The version the code expects. Derived, so it can never drift from the list. */

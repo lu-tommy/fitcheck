@@ -13,6 +13,7 @@ import { useSync, watchForExternalChanges } from '@/store/sync';
 import { Toaster } from '@/components/ui/Toaster';
 import { useCloset } from '@/store/closet';
 import { useOutfits } from '@/store/outfits';
+import { useTaste } from '@/store/taste';
 import { usePlanner } from '@/store/planner';
 import { usePreferences } from '@/store/preferences';
 import { useWeather } from '@/store/weather';
@@ -46,6 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     void usePreferences.getState().hydrate();
     void useCloset.getState().hydrate();
     void useOutfits.getState().hydrate();
+    void useTaste.getState().hydrate();
     void usePlanner.getState().hydrate();
     void useWishlist.getState().hydrate();
     void useWeather.getState().hydrate();

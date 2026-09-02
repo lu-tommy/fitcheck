@@ -487,6 +487,10 @@ describe('everything else in the wardrobe', () => {
       id: 'wish-1', name: 'Camel coat', category: 'coat', source: 'manual',
       purchased: false, createdAt: stamp, updatedAt: stamp,
     });
+    await put('signals', {
+      id: 'sig-1', itemId: 'a', kind: 'chosen', date: '2026-01-01',
+      createdAt: stamp, updatedAt: stamp,
+    });
 
     await sync(server);
     await clearAll();

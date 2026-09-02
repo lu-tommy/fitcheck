@@ -11,6 +11,7 @@ import type {
 } from '@/types';
 
 import { analyzeHarmony, hexForColorName } from './color';
+import { AFFINITY_WEIGHT } from './taste';
 import {
   ACCESSORY_FOCAL_BUDGET,
   accessoryFocalWeight,
@@ -52,6 +53,15 @@ export interface EngineContext {
    * who set Fahrenheit is never told it is 18 degrees outside.
    */
   units?: Units;
+  /**
+   * What the wearer has actually reached for, −1 to 1 per item.
+   *
+   * A nudge and nothing more — see AFFINITY_WEIGHT and the note at the top of
+   * domain/taste. It must never be able to outvote the weather, the occasion or
+   * the laundry, because those are facts and this is an inference drawn from a
+   * few taps.
+   */
+  affinity?: Map<string, number>;
   /** Garments that suit the occasion, read from what the wearer typed. */
   preferCategories?: Category[];
   /**
@@ -135,6 +145,10 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
     if (colorText.includes(wanted)) score += 18;
   }
   if (context.avoidColors?.some((color) => colorText.includes(color.toLowerCase()))) score -= 30;
+
+  // What they have actually reached for, when there is enough to go on.
+  const affinity = context.affinity?.get(item.id);
+  if (affinity) score += affinity * AFFINITY_WEIGHT;
 
   // Nudge towards favourites and away from the same three pieces every day.
   if (item.favorite) score += 8;

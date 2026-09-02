@@ -93,7 +93,11 @@ export function db(): Promise<IDBPDatabase<FitCheckDB>> {
   return dbPromise;
 }
 
-type CollectionName = 'items' | 'outfits' | 'wearLogs' | 'calendar' | 'packing' | 'wishlist';
+/**
+ * The stores that hold records with an identity, a stamp and a tombstone.
+ * Kept in step with SyncedStore in @/types — everything here synchronises.
+ */
+type CollectionName = SyncedStore;
 
 export async function readAll<K extends CollectionName>(
   store: K,
@@ -183,6 +187,7 @@ export async function clearAll(): Promise<void> {
     'calendar',
     'packing',
     'wishlist',
+    'signals',
     'photos',
     'meta',
     'deletions',
