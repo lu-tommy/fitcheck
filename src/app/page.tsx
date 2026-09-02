@@ -6,6 +6,7 @@ import {
   Layers,
   Shirt,
   Sparkles,
+  Share2,
   Shuffle,
   Undo2,
   WashingMachine,
@@ -35,6 +36,7 @@ import { createId } from '@/lib/id';
 import { nowIso } from '@/lib/date';
 import { todayKey } from '@/lib/date';
 import { formatTemperature } from '@/lib/format';
+import { renderOutfitImage, shareImage } from '@/lib/outfitImage';
 import { weatherKind } from '@/lib/weather';
 import { pluralize } from '@/lib/format';
 import { useActiveItems, useCloset, useResolvedItems } from '@/store/closet';
@@ -59,6 +61,7 @@ export default function HomePage() {
   const recordSignal = useTaste((state) => state.record);
   const recordWorn = useTaste((state) => state.recordWorn);
   const [loadingDemo, setLoadingDemo] = useState(false);
+  const [sharing, setSharing] = useState(false);
   /*
    * The greeting and the date are the only things on this screen that depend on
    * WHEN it is rendered, and Next prerenders this route at build time
@@ -186,6 +189,34 @@ export default function HomePage() {
     if (pinMatches(pin, today, shownIds)) return;
     void updatePreferences({ outfitOfTheDay: { date: today, itemIds: shownIds } });
   }, [shownIds?.join(','), today, wornToday, plannedOutfit]);
+
+  /*
+   * The share card exists and was reachable only from an outfit already saved,
+   * which is two screens past the moment somebody actually wants to send it.
+   * The Fit Score is what makes it worth sending: a flat lay is a photograph of
+   * some clothes, and a flat lay with a number on it is an argument.
+   */
+  async function share() {
+    if (!suggestion || sharing) return;
+    setSharing(true);
+    let blob: Blob;
+    try {
+      blob = await renderOutfitImage(suggestionItems, {
+        title: suggestion.name,
+        subtitle: longDate(today),
+        score: fit ? { value: fit.score, verdict: fit.verdict } : undefined,
+      });
+    } catch (error) {
+      toast((error as Error).message, { tone: 'danger' });
+      setSharing(false);
+      return;
+    }
+    // The spinner covers the render, not the share sheet: once the OS has the
+    // file the button must work again, even if the sheet never reports back.
+    setSharing(false);
+    const result = await shareImage(blob, 'outfit-of-the-day.png', suggestion.name);
+    if (result === 'downloaded') toast('Saved to your downloads');
+  }
 
   /** Put this one away and pick again. The pin goes with it or nothing changes. */
   function reroll() {
@@ -430,12 +461,23 @@ export default function HomePage() {
           <section className="-mx-5">
             <div className="flex items-baseline justify-between px-5">
               <p className="text-label text-[var(--text-faint)]">Outfit of the Day</p>
-              <Link
-                href="/generate"
-                className="pressable -my-3 px-1.5 py-3 text-[0.8125rem] font-medium text-[var(--brand)]"
-              >
-                Change
-              </Link>
+              <div className="flex items-center gap-3.5">
+                <button
+                  type="button"
+                  onClick={() => void share()}
+                  disabled={sharing}
+                  className="pressable -my-3 inline-flex items-center gap-1.5 px-1.5 py-3 text-[0.8125rem] font-medium text-[var(--brand)] disabled:opacity-50"
+                >
+                  <Share2 size={14} />
+                  {sharing ? 'Rendering…' : 'Share'}
+                </button>
+                <Link
+                  href="/generate"
+                  className="pressable -my-3 px-1.5 py-3 text-[0.8125rem] font-medium text-[var(--brand)]"
+                >
+                  Change
+                </Link>
+              </div>
             </div>
 
             <OutfitCollage

@@ -289,6 +289,12 @@ canvas and hands it to the share sheet, so **what you arrange is exactly what
 you send**. Nothing is uploaded and it works offline. Rendering a five-piece
 outfit from real photos takes about 300ms on a throttled phone.
 
+The Outfit of the Day carries a **Share** button of its own. The share card was
+reachable only from an outfit already saved, which is two screens past the
+moment somebody wants to send it — and the picture now carries the Fit Score
+badge and the verdict, because a flat lay is a photograph of some clothes and a
+flat lay with a number on it is an argument.
+
 **Which one?** — the generator can build a second option, excluding everything
 in the first so the two are genuinely different, and share both as a single
 picture. This is the one feature in the roadmap that the commercial apps

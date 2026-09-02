@@ -23,6 +23,9 @@ export interface RenderTheme {
   ink: string;
   muted: string;
   panel: string;
+  /** The one accent, for the score badge. Deep enough to read as furniture. */
+  brand: string;
+  onBrand: string;
 }
 
 export const LIGHT_THEME: RenderTheme = {
@@ -30,6 +33,8 @@ export const LIGHT_THEME: RenderTheme = {
   ink: '#1a1714',
   muted: '#7a716a',
   panel: '#ffffff',
+  brand: '#1f4a3d',
+  onBrand: '#ffffff',
 };
 
 /** A decoded photo, or the colour to draw in its place. */
@@ -176,6 +181,14 @@ export async function renderOutfitImage(
     subtitle?: string;
     layout?: CollagePlacement[];
     theme?: RenderTheme;
+    /**
+     * The Fit Score, when there is one.
+     *
+     * This is the whole reason the picture is worth sending. A flat lay is a
+     * nice photograph of some clothes; a flat lay with a number and a one-word
+     * verdict on it is an argument, and an argument is what people reply to.
+     */
+    score?: { value: number; verdict: string };
   },
 ): Promise<Blob> {
   const theme = options.theme ?? LIGHT_THEME;
@@ -187,16 +200,38 @@ export async function renderOutfitImage(
   const bounds = { x: 72, y: 168, width: WIDTH - 144, height: HEIGHT - 168 - 148 };
   const opened = await drawCollage(context, items, options.layout, bounds, theme);
 
+  // The badge is laid out first so the title knows how much room it has left.
+  const badge = options.score ? { width: 176, height: 100, x: WIDTH - 72 - 176, y: 40 } : null;
+  const titleWidth = WIDTH - 144 - (badge ? badge.width + 32 : 0);
+
   context.textAlign = 'left';
   context.textBaseline = 'alphabetic';
   context.fillStyle = theme.ink;
   context.font = `700 62px ${FONT}`;
-  context.fillText(options.title, 72, 108, WIDTH - 144);
+  context.fillText(options.title, 72, 108, titleWidth);
 
   if (options.subtitle) {
     context.fillStyle = theme.muted;
     context.font = `400 34px ${FONT}`;
-    context.fillText(options.subtitle, 72, 150, WIDTH - 144);
+    context.fillText(options.subtitle, 72, 150, titleWidth);
+  }
+
+  if (badge && options.score) {
+    roundedPath(context, badge.x, badge.y, badge.width, badge.height, 26);
+    context.fillStyle = theme.brand;
+    context.fill();
+
+    context.textAlign = 'center';
+    context.fillStyle = theme.onBrand;
+    context.font = `700 56px ${FONT}`;
+    context.fillText(String(options.score.value), badge.x + badge.width / 2, badge.y + 62);
+    context.font = `600 20px ${FONT}`;
+    context.fillText('FIT SCORE', badge.x + badge.width / 2, badge.y + 86);
+
+    context.textAlign = 'right';
+    context.fillStyle = theme.muted;
+    context.font = `500 30px ${FONT}`;
+    context.fillText(options.score.verdict, WIDTH - 72, badge.y + badge.height + 40);
   }
 
   context.fillStyle = theme.muted;
