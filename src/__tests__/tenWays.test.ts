@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { MIN_WAYS, tenWays } from '@/domain/tenWays';
+import { buildOutfitLocally } from '@/domain/outfitEngine';
+import { slotOf } from '@/domain/taxonomy';
 import type { ClothingItem } from '@/types';
 
 import { makeItem } from './factories';
@@ -85,15 +87,39 @@ describe('tenWays', () => {
   /*
    * A cold day and a warm day are genuinely different outfits, which is the
    * point of asking ten questions rather than shuffling one.
+   *
+   * Asserted on the outfits rather than on two particular labels surviving:
+   * later contexts rest everything the earlier ones used and duplicates are
+   * dropped, so which labels come back depends on the wardrobe — and a test
+   * that named two of them was testing the resting order by accident.
    */
-  it('answers a cold day differently from a warm one', () => {
+  it('does not produce ten versions of the same outfit', () => {
     const ways = tenWays(hero(), wardrobe());
-    const cold = ways.find((way) => way.label === 'Cold day');
-    const warm = ways.find((way) => way.label === 'Warm day');
-    if (cold && warm) {
-      expect(cold.itemIds.join()).not.toBe(warm.itemIds.join());
-    }
-    expect(cold ?? warm).toBeDefined();
+    const shapes = new Set(
+      ways.map((way) =>
+        way.itemIds
+          .map((id) => slotOf(wardrobe().find((item) => item.id === id)!.category))
+          .sort()
+          .join('+'),
+      ),
+    );
+    expect(ways.length).toBeGreaterThan(MIN_WAYS);
+    expect(shapes.size, 'every look is the same shape').toBeGreaterThan(1);
+  });
+
+  it('reaches for a coat when the question is a cold one', () => {
+    const built = buildOutfitLocally({
+      request: {
+        prompt: 'x',
+        includeItemIds: ['hero'],
+        excludeItemIds: [],
+        cleanOnly: false,
+        formality: 'casual',
+        temperature: 3,
+      },
+      closet: wardrobe(),
+    });
+    expect(built.itemIds, 'no coat at three degrees').toContain('coat');
   });
 
   it('runs out gracefully on a wardrobe with nothing to offer', () => {

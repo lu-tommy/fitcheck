@@ -855,6 +855,40 @@ shopping list rather than a sentence, because the category labels are a mix of
 singular and plural and any phrasing with an article produces *"a shorts or
 joggers"* for somebody to read on a Tuesday morning.
 
+### Five more of the same shape
+
+Once the engine was allowed to say "you do not own this", the same failure
+turned up in five more places — a number, a garment or a verdict produced where
+the honest answer was *there is nothing here to judge*:
+
+- **An empty outfit scored 60 out of 100**, "fine, if a bit quiet". A single
+  pair of trousers scored 52, "something in here is fighting" — with nothing to
+  fight. Every rule that fired did so by accident. There is no score now until
+  it is a whole outfit, and the card says which piece is missing instead.
+- **A jumper worn on its own was not a whole outfit**, because the check
+  demanded the `top` slot specifically. That is what a great many people wear
+  all winter, and it was being dropped from the ten-ways screen entirely.
+- **Warmth was only ever a penalty.** A light garment lost points in the cold
+  and nothing ever gained any, so a wool coat and an olive field jacket scored
+  identically at three degrees — the engine had no way to prefer the warmer of
+  two suitable coats, which is the whole question on a cold morning.
+- **A coat was skipped when the layers happened to add up.** A jumper, a shirt,
+  jeans and boots met the warmth target at three degrees, so the engine stopped
+  — sending somebody out into it with no coat because the sums balanced. Below
+  about eight degrees a coat is not an optimisation.
+- **Outerwear was judged as strictly as a shirt.** A wool coat over jeans is two
+  formality steps out and completely ordinary; at full weight that alone lost it
+  to a field jacket in the cold. A coat is the one thing everybody wears across
+  registers.
+
+And one more of the engine disagreeing with its own critic: **it assembled a
+third colour that the score then marked down** — green wellies, a burgundy scarf
+and a gold ring on the same school run. Harmony is clamped to four points either
+way, deliberately, so it was far too weak to notice a third hue arriving. An
+accessory is never worth a third colour, so that is a gate rather than a cost;
+the garments that carry the outfit still take it as a cost, because leaving
+somebody without trousers is not free.
+
 ## Testing
 
 `npm test` covers the domain layer — the outfit engine's slot rules and

@@ -335,3 +335,89 @@ describe('when the wardrobe genuinely cannot do it', () => {
     expect(outfit.itemIds, 'overruled a deliberate choice').toContain('tee');
   });
 });
+
+/**
+ * Things the app stated confidently when it had nothing to state.
+ *
+ * All of a piece with improvising a t-shirt for a wedding: a number, a garment
+ * or a verdict produced where the honest answer was "there is nothing here to
+ * judge". A wrong answer given confidently is worse than no answer, because it
+ * is believed.
+ */
+describe('claims made where there was nothing to claim', () => {
+  it('does not score half an outfit', () => {
+    const trousers = [makeItem({ category: 'dress-pants', name: 'Charcoal trousers' })];
+    const report = scoreOutfit(trousers);
+    // It used to come back at 52 with "something in here is fighting" — with
+    // nothing to fight.
+    expect(report.complete).toBe(false);
+    expect(report.verdict).toMatch(/yet/i);
+    expect(report.deductions, 'rules fired on one garment').toEqual([]);
+    expect(report.credits).toEqual([]);
+  });
+
+  it('does not score an empty outfit at sixty out of a hundred', () => {
+    const report = scoreOutfit([]);
+    expect(report.complete).toBe(false);
+    expect(report.verdict).toMatch(/nothing/i);
+  });
+
+  it('counts a jumper worn on its own as a top', () => {
+    const worn = [
+      makeItem({ category: 'sweater', name: 'Oatmeal knit' }),
+      makeItem({ category: 'jeans', name: 'Jeans' }),
+      makeItem({ category: 'boots', name: 'Boots' }),
+    ];
+    // Insisting on a shirt underneath called an ordinary winter outfit
+    // incomplete, and dropped it from the ten-ways screen entirely.
+    expect(scoreOutfit(worn).complete).toBe(true);
+  });
+
+  /*
+   * Everything about warmth was subtractive — a light garment lost points in
+   * the cold — so the engine had no way to prefer the warmer of two suitable
+   * coats, which is the whole question on a cold morning.
+   */
+  it('reaches for the warmer of two coats when it is cold', () => {
+    const closet = [
+      makeItem({ id: 'tee', category: 'tshirt' }),
+      makeItem({ id: 'jeans', category: 'jeans' }),
+      makeItem({ id: 'boots', category: 'boots' }),
+      makeItem({ id: 'jacket', category: 'jacket', name: 'Olive field jacket' }),
+      makeItem({ id: 'coat', category: 'coat', name: 'Wool coat', formality: 'business-casual' }),
+    ];
+    const outfit = dress(closet, { temperature: 3, formality: 'casual' });
+    expect(outfit.itemIds, 'a field jacket at three degrees').toContain('coat');
+  });
+
+  it('takes a coat at three degrees even when the layers already add up', () => {
+    const closet = [
+      makeItem({ id: 'knit', category: 'sweater' }),
+      makeItem({ id: 'shirt', category: 'shirt' }),
+      makeItem({ id: 'jeans', category: 'jeans' }),
+      makeItem({ id: 'boots', category: 'boots' }),
+      makeItem({ id: 'coat', category: 'coat' }),
+    ];
+    const outfit = dress(closet, { temperature: 3 });
+    expect(outfit.itemIds, 'no coat because the sums balanced').toContain('coat');
+  });
+
+  /*
+   * The engine and its own critic have to agree. Assembling an outfit and then
+   * explaining underneath why it is wrong reads as the app arguing with itself.
+   */
+  it('does not assemble a third colour its own score marks down', () => {
+    const closet = [
+      makeItem({ id: 'tee', category: 'tshirt', primaryColor: 'black' }),
+      makeItem({ id: 'jeans', category: 'jeans', primaryColor: 'black' }),
+      makeItem({ id: 'wellies', category: 'rain-boots', primaryColor: 'green', wearCount: 20 }),
+      makeItem({ id: 'scarf', category: 'scarf', primaryColor: 'burgundy', wearCount: 20 }),
+      makeItem({ id: 'ring', category: 'ring', primaryColor: 'yellow', wearCount: 30 }),
+      makeItem({ id: 'watch', category: 'watch', primaryColor: 'grey', wearCount: 30 }),
+    ];
+    const outfit = dress(closet, { temperature: 9 });
+    const worn = outfit.itemIds.map((id) => closet.find((item) => item.id === id)!);
+    const anchor = scoreOutfit(worn).deductions.find((note) => note.rule === 'anchor');
+    expect(anchor?.note, 'built an outfit it then criticised').toBeUndefined();
+  });
+});

@@ -54,7 +54,22 @@ export interface Unjudged {
 }
 
 export interface FitScore {
-  /** 0–100. */
+  /**
+   * False when this is not yet a whole outfit, and the number means nothing.
+   *
+   * The rules were run over whatever they were handed, so a single pair of
+   * trousers came back at 52 with "something in here is fighting" — with
+   * nothing to fight — and an EMPTY outfit came back at 60, "fine, if a bit
+   * quiet". Every rule that fired did so by accident: the third-piece mark
+   * cannot be earned by a garment that has no outfit round it, and the colour
+   * rules need two colours before they mean anything.
+   *
+   * This is the same failure as the engine improvising a t-shirt for a wedding.
+   * A number produced where there is nothing to judge is worse than no number,
+   * because it is believed.
+   */
+  complete: boolean;
+  /** 0–100, and only meaningful when `complete`. */
   score: number;
   /** One line, and the only place this app gets to be funny once a day. */
   verdict: string;
@@ -79,9 +94,41 @@ const REGISTER: Slot[] = ['top', 'bottom', 'fullbody'];
 /** Fits that read as volume rather than as a line. */
 const VOLUME = new Set(['relaxed', 'oversized']);
 
+/**
+ * What an outfit needs before any of the eight rules mean anything.
+ *
+ * A midlayer counts as the top when there is no top, because a jumper worn on
+ * its own is what a great many people wear all winter — insisting on a shirt
+ * underneath it called a perfectly ordinary outfit incomplete.
+ */
+export function whatIsMissing(items: ClothingItem[]): string | null {
+  if (items.length === 0) return 'Nothing here yet.';
+  const slots = new Set(items.map((item) => slotOf(item.category)));
+  const onTop = slots.has('top') || slots.has('midlayer');
+  const covered = slots.has('fullbody') || (onTop && slots.has('bottom'));
+
+  if (!covered && !onTop) return 'Nothing on top yet.';
+  if (!covered) return 'Nothing on the bottom yet.';
+  if (!slots.has('footwear')) return 'No shoes yet.';
+  return null;
+}
+
 export function scoreOutfit(items: ClothingItem[]): FitScore {
   const notes: ScoreNote[] = [];
   const unjudged: Unjudged[] = [];
+
+  // Nothing to judge, so nothing is claimed. See `complete`.
+  const incomplete = whatIsMissing(items);
+  if (incomplete) {
+    return {
+      complete: false,
+      score: 0,
+      verdict: incomplete,
+      credits: [],
+      deductions: [],
+      unjudged: [],
+    };
+  }
 
   const add = (note: ScoreNote | null) => {
     if (note) notes.push(note);
@@ -101,6 +148,7 @@ export function scoreOutfit(items: ClothingItem[]): FitScore {
   const score = Math.max(0, Math.min(100, Math.round(total)));
 
   return {
+    complete: true,
     score,
     verdict: verdictFor(score),
     credits: notes.filter((note) => note.points > 0),

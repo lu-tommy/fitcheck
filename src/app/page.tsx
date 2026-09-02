@@ -215,7 +215,7 @@ export default function HomePage() {
       blob = await renderOutfitImage(suggestionItems, {
         title: suggestion.name,
         subtitle: longDate(today),
-        score: fit ? { value: fit.score, verdict: fit.verdict } : undefined,
+        score: fit?.complete ? { value: fit.score, verdict: fit.verdict } : undefined,
       });
     } catch (error) {
       toast((error as Error).message, { tone: 'danger' });
@@ -508,7 +508,7 @@ export default function HomePage() {
             <div className="px-5">
               <div className="mt-3.5 flex items-baseline justify-between gap-3">
                 <h2 className="text-title min-w-0 truncate">{suggestion.name}</h2>
-                {fit ? (
+                {fit?.complete ? (
                   <p className="shrink-0 text-[0.875rem] text-[var(--text-muted)]">
                     <span className="text-display tabular-nums" style={{ fontSize: '1.25rem' }}>
                       {fit.score}

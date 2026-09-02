@@ -199,7 +199,14 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
    */
   const target = request.formality ?? 'casual';
   const distance = Math.abs(formalityScore(item.formality) - formalityScore(target));
-  score += Math.max(-24, 12 - distance * 8);
+  /*
+   * Outerwear is judged more gently, because a coat is the one thing everybody
+   * wears across registers. A wool coat over jeans and a tee is completely
+   * ordinary; at full weight it was two steps too smart for a casual day, and
+   * an olive field jacket beat it at three degrees on that alone.
+   */
+  const weight = slotOf(item.category) === 'outerwear' ? 4 : 8;
+  score += Math.max(-24, 12 - distance * weight);
 
   // Style match.
   const wantedStyle = request.style ? [request.style] : (context.preferredStyles ?? []);
@@ -215,6 +222,23 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
   // Fleece joggers are not a two-warmth garment and were sailing through.
   if (temperature >= 27 && warmth >= 1) score -= 22;
   if (temperature <= 6 && warmth === 0 && slot !== 'accessory') score -= 8;
+
+  /*
+   * When it is genuinely cold, warmth is a virtue and not merely the absence of
+   * a penalty.
+   *
+   * Everything about warmth was subtractive — a light garment lost points in
+   * the cold — so a wool coat and an olive field jacket scored identically at
+   * three degrees, and the jacket won on being a step less formal. The engine
+   * had no way to prefer the warmer of two suitable coats, which is the entire
+   * question on a cold morning.
+   *
+   * The deficit is capped so that minus forty and minus five behave alike:
+   * past a point everything warm is equally the right answer, and the numbers
+   * should not run away.
+   */
+  const deficit = Math.min(16, Math.max(0, 12 - temperature));
+  if (deficit > 0) score += warmth * deficit * 1.5;
 
   /*
    * A wool scarf is not a mild preference in June.
@@ -481,10 +505,46 @@ function slotAlternativesFor(
     .map((entry) => ({
       ...entry,
       score:
-        entry.score + harmonyBonus(entry.item, chosen) + formalityClashPenalty(entry.item, chosen),
+        entry.score +
+        harmonyBonus(entry.item, chosen) +
+        colourCrowding(entry.item, chosen) +
+        formalityClashPenalty(entry.item, chosen),
     }))
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.item);
+}
+
+/**
+ * What it costs to bring a third colour to an outfit that already has two.
+ *
+ * The scorer takes fourteen points off an outfit with three colours fighting,
+ * and the builder had nothing to stop it assembling one: harmony is clamped to
+ * four points either way, deliberately, so that colour cannot decide which
+ * garment somebody wears. That leaves it far too weak to notice a third hue
+ * arriving — and green wellies, a burgundy scarf and gold jewellery all turned
+ * up on the same school run, which the card underneath then explained was
+ * wrong. An engine that argues with its own critic is worse than either alone.
+ *
+ * Charged only on the third, because two is the limit stylists work to and the
+ * anchor rule agrees.
+ */
+function colourCrowding(candidate: ClothingItem, chosen: ClothingItem[]): number {
+  const hexOf = (item: ClothingItem) =>
+    item.primaryColorHex || hexForColorName(item.primaryColor);
+
+  const families = (items: ClothingItem[]) => {
+    const hues: number[] = [];
+    items
+      .filter((item) => !isNeutral(hexOf(item)))
+      .forEach((item) => {
+        const { h } = hexToHsl(hexOf(item));
+        if (!hues.some((other) => hueDistance(h, other) <= 40)) hues.push(h);
+      });
+    return hues.length;
+  };
+
+  const before = families(chosen);
+  return families([...chosen, candidate]) > Math.max(2, before) ? -18 : 0;
 }
 
 function pickForSlot(
@@ -718,8 +778,18 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
    * outfit that was warm enough and stopped — sending somebody out into a
    * downpour in a t-shirt, having read the forecast to decide it.
    */
+  /*
+   * And cold is its own reason too, the same way rain is.
+   *
+   * Layering was driven purely by the warmth arithmetic, so a jumper, a shirt,
+   * jeans and boots met the target at three degrees and the engine stopped —
+   * sending somebody out into it with no coat because the sums balanced. Below
+   * about eight degrees a coat is not an optimisation, it is the thing you put
+   * on before you leave.
+   */
+  const cold = temperature <= 8;
   if (
-    (warmthOf(chosen) < needed || raining) &&
+    (warmthOf(chosen) < needed || raining || cold) &&
     !chosen.some((item) => slotOf(item.category) === 'outerwear')
   ) {
     takeLayer('outerwear');
@@ -817,6 +887,17 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
        * the eyes, and went to dinner. A budget is a ceiling, never a quota.
        */
       .filter((entry) => entry.score >= ACCESSORY_FLOOR)
+      /*
+       * And never a third colour.
+       *
+       * A penalty was not enough: the ring was still the best thing left for a
+       * finger, so it went on anyway and the card underneath explained that
+       * three colours were fighting. Accessories are optional, which makes
+       * declining one free — and no accessory is worth a third colour. The
+       * garments that carry the outfit still take this as a cost rather than a
+       * ban, because leaving somebody without trousers is not free.
+       */
+      .filter((entry) => colourCrowding(entry.item, chosen) === 0)
       .map((entry) => ({
         entry,
         // Matching what is already on wins ties and a little more; it never
@@ -897,7 +978,10 @@ function missingSlotWarnings(
   const slots = new Set(chosen.map((item) => slotOf(item.category)));
   const warnings: string[] = [];
   const hasFullbody = slots.has('fullbody');
-  if (!hasFullbody && !slots.has('top')) warnings.push('No suitable top was available.');
+  // A jumper on its own is a top, the same way it is for the scorer.
+  if (!hasFullbody && !slots.has('top') && !slots.has('midlayer')) {
+    warnings.push('No suitable top was available.');
+  }
   if (!hasFullbody && !slots.has('bottom')) warnings.push('No suitable bottom was available.');
   if (!slots.has('footwear')) warnings.push('No suitable shoes were available.');
 

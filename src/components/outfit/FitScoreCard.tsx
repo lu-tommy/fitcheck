@@ -24,6 +24,23 @@ export function FitScoreCard({
 }) {
   const notes = [...report.deductions, ...report.credits];
 
+  /*
+   * No number where there is nothing to judge. The rules run over whatever they
+   * are handed, so half an outfit used to come back with a confident 52 and
+   * "something in here is fighting" — with nothing to fight.
+   */
+  if (!report.complete) {
+    return (
+      <section className={cn('card px-4 py-3.5', className)}>
+        <p className="text-[0.9375rem] font-medium">{report.verdict}</p>
+        <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
+          There is no score until this is a whole outfit — a top, a bottom and
+          shoes, or a one-piece and shoes.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className={cn('card overflow-hidden', className)}>
       <div className="flex items-center gap-3.5 border-b border-[var(--border)] px-4 py-3.5">

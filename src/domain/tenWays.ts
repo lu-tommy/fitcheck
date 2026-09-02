@@ -110,6 +110,8 @@ export function tenWays(
     seen.add(key);
 
     const report = scoreOutfit(worn);
+    // A way to wear something has to be a whole outfit.
+    if (!report.complete) continue;
     ways.push({
       label: context.label,
       itemIds: built.itemIds,

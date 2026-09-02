@@ -120,6 +120,10 @@ export function readWardrobeReport(items: ClothingItem[]): WardrobeReport {
     if (worn.length < 2) return;
 
     const report = scoreOutfit(worn);
+    // An incomplete outfit scores nothing, and averaging that zero in would
+    // report a wardrobe with no shoes in it as uniformly terrible rather than
+    // as short of shoes.
+    if (!report.complete) return;
     samples.push({
       itemIds: built.itemIds,
       score: report.score,
