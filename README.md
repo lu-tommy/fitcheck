@@ -239,6 +239,34 @@ binned. That is what stops a pair of shoes photographed on a duvet coming back
 the colour of the duvet. If discarding the backdrop leaves almost nothing, the
 garment fills the frame and *is* that colour, so the filter is dropped.
 
+## Outfit of the Day
+
+The home screen's suggestion was labelled *"Suggested for today"*, which is a
+hedge on the one screen where confidence is the entire product. It is the
+**Outfit of the Day** now — and the name only earns itself because three things
+changed behind it.
+
+**It holds still.** The suggestion was rebuilt whenever its inputs moved, and
+the weather is one of those inputs, so an outfit could quietly become a
+different outfit between breakfast and the front door. The day's pick is
+written down and fed back into the engine as pieces to *include*, rather than
+laid over the top of the result — which is what keeps the name, the explanation
+and the colour notes describing the outfit actually on screen. A pin goes stale
+in more ways than by being yesterday's, so a piece archived, deleted or thrown
+in the wash drops the lot and the day is picked again: half an outfit is worse
+than a fresh one.
+
+**Shuffle rerolls in place.** "Something else" used to be a link to the
+generator, which is a whole screen away for what is usually just *not that
+one*. It remembers what it has already shown, as a penalty rather than a ban,
+so pressing it twice means something and a small wardrobe still gets dressed.
+
+**It has a name worth reading.** `localName` returned "Everyday navy" — a
+category with a colour stuck on the end. The engine already knows the hero
+piece, what is under it and what the weather is doing, which is enough for
+"Cream over indigo", "Navy under the olive" or "Charcoal, wrapped up". Still
+deterministic: same closet, same day, same name.
+
 ## Changing one piece
 
 The suggestion is a starting point, not a verdict. Each piece can be stepped

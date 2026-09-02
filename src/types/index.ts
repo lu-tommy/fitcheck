@@ -384,6 +384,11 @@ export interface Preferences {
   lastBackupAt?: string;
   /** Set once the install card has been dismissed, so it asks only once. */
   installPromptDismissed?: boolean;
+  /**
+   * Today's Outfit of the Day, written down so it stops changing underneath
+   * whoever is looking at it. See domain/ootd.
+   */
+  outfitOfTheDay?: { date: string; itemIds: string[] };
 }
 
 /**

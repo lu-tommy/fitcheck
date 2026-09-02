@@ -6,6 +6,7 @@ import {
   Layers,
   Shirt,
   Sparkles,
+  Shuffle,
   Undo2,
   WashingMachine,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ import { WeatherCard } from '@/components/WeatherCard';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { EmptyState, SectionHeader } from '@/components/ui/Feedback';
 import { scoreOutfit } from '@/domain/fitScore';
+import { pinIsUsable, pinMatches } from '@/domain/ootd';
 import { buildOutfitLocally, cycleSlot, slotAlternatives } from '@/domain/outfitEngine';
 import { demoWardrobe } from '@/domain/seed';
 import { putPhoto } from '@/db';
@@ -49,6 +51,7 @@ export default function HomePage() {
   const { outfits, wearLogs, saveOutfit, wearOutfit, undoWear } = useOutfits();
   const entryFor = usePlanner((state) => state.entryFor);
   const preferences = usePreferences((state) => state.preferences);
+  const updatePreferences = usePreferences((state) => state.update);
   const weather = useWeather((state) => state.snapshot);
   const [loadingDemo, setLoadingDemo] = useState(false);
   /*
@@ -85,12 +88,25 @@ export default function HomePage() {
    * key is configured. Opening the app should not spend money, and the picker
    * on the Generate screen is where a considered suggestion belongs.
    */
+  /*
+   * Today's pick, written down. It is fed back in as pieces to INCLUDE rather
+   * than laid over the top of the result, so the name, the explanation and the
+   * colour notes all describe what is on screen — see domain/ootd for why an
+   * outfit with a name must not change between breakfast and the front door.
+   */
+  const wearable = useMemo(() => items.filter((item) => item.laundry === 'clean'), [items]);
+  const pin = preferences.outfitOfTheDay;
+  const pinned = pinIsUsable(pin, today, wearable) ? pin!.itemIds : null;
+
+  /** Pieces already shown today, so a reroll means something. A penalty, not a ban. */
+  const [seen, setSeen] = useState<string[]>([]);
+
   const suggestion = useMemo(() => {
     if (items.length < 3 || plannedOutfit || wornToday) return null;
     return buildOutfitLocally({
       request: {
         prompt: 'Something for today',
-        includeItemIds: [],
+        includeItemIds: pinned ?? [],
         excludeItemIds: [],
         cleanOnly: true,
       },
@@ -99,6 +115,7 @@ export default function HomePage() {
       preferredStyles: preferences.preferredStyles,
       avoidColors: preferences.avoidColors,
       units: preferences.units,
+      restingItemIds: seen,
     });
   }, [
     items,
@@ -108,6 +125,8 @@ export default function HomePage() {
     preferences.units,
     plannedOutfit,
     wornToday,
+    pinned?.join(','),
+    seen,
   ]);
 
   /*
@@ -141,6 +160,20 @@ export default function HomePage() {
   useEffect(() => {
     setSwappedIds(null);
   }, [suggestion?.itemIds.join(',')]);
+
+  useEffect(() => {
+    if (!shownIds?.length || wornToday || plannedOutfit) return;
+    if (pinMatches(pin, today, shownIds)) return;
+    void updatePreferences({ outfitOfTheDay: { date: today, itemIds: shownIds } });
+  }, [shownIds?.join(','), today, wornToday, plannedOutfit]);
+
+  /** Put this one away and pick again. The pin goes with it or nothing changes. */
+  function reroll() {
+    const current = shownIds ?? [];
+    setSeen((already) => [...new Set([...already, ...current])]);
+    setSwappedIds(null);
+    void updatePreferences({ outfitOfTheDay: undefined });
+  }
 
   /** How many garments could fill each slot, so a lone option reads as fixed. */
   const optionCounts = useMemo(() => {
@@ -399,9 +432,15 @@ export default function HomePage() {
                 <Button full icon={<Check size={17} />} onClick={saveSuggestion}>
                   Wear this
                 </Button>
-                <ButtonLink href="/generate" variant="secondary" full>
-                  Something else
-                </ButtonLink>
+                {/*
+                  * This used to be a link to the generator, which is a whole
+                  * screen away for what is usually just "not that one". The
+                  * shuffle rerolls in place and remembers what it has already
+                  * shown, so pressing it twice means something.
+                  */}
+                <Button variant="secondary" icon={<Shuffle size={17} />} onClick={reroll}>
+                  Shuffle
+                </Button>
               </div>
 
               <SlotPicker

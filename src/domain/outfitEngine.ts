@@ -20,7 +20,7 @@ import {
   slotOf,
 } from './taxonomy';
 import { currentSeason } from '@/lib/date';
-import { formatTemperatureLong } from '@/lib/format';
+import { formatTemperatureLong, titleCase } from '@/lib/format';
 
 /**
  * Rule-based outfit builder.
@@ -426,15 +426,40 @@ function missingSlotWarnings(
   return warnings.length ? warnings : undefined;
 }
 
+/**
+ * What to call it.
+ *
+ * This used to return "Everyday navy" — a category label with a colour stuck on
+ * the end, which is a fine thing to file under and a poor thing to lead a home
+ * screen with. The engine already knows the hero piece, what is underneath it
+ * and what the weather is doing; that is enough for a name that describes THIS
+ * outfit rather than the class of outfits it belongs to. Still deterministic:
+ * the same closet and the same day give the same name, so nothing shifts under
+ * a re-render.
+ */
 function localName(
   chosen: ClothingItem[],
   request: OutfitRequest,
   temperature: number,
 ): string {
   if (request.occasion) return `${request.occasion} look`;
+
   const hero = chosen.find((item) => ['top', 'fullbody'].includes(slotOf(item.category)));
-  const descriptor = temperature <= 8 ? 'Cold-weather' : temperature >= 25 ? 'Warm-weather' : 'Everyday';
-  return hero ? `${descriptor} ${hero.primaryColor}` : `${descriptor} look`;
+  const bottom = chosen.find((item) => slotOf(item.category) === 'bottom');
+  const layer = chosen.find((item) =>
+    ['outerwear', 'midlayer'].includes(slotOf(item.category)),
+  );
+
+  if (!hero) return 'Something for today';
+  const colour = titleCase(hero.primaryColor);
+
+  if (temperature <= 4) return `${colour}, wrapped up`;
+  if (temperature >= 27) return `${colour}, and not much of it`;
+  if (layer) return `${colour} under the ${layer.primaryColor.toLowerCase()}`;
+  if (bottom && bottom.primaryColor.toLowerCase() !== hero.primaryColor.toLowerCase()) {
+    return `${colour} over ${bottom.primaryColor.toLowerCase()}`;
+  }
+  return `${colour}, head to toe`;
 }
 
 function localExplanation(
