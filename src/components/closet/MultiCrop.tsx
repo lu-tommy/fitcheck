@@ -1,10 +1,10 @@
 'use client';
 
-import { Maximize2, Minus, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Crop, Hand, Maximize2, Minus, Plus, Trash2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
-import { MIN_BOX, normaliseBox, type CropBox } from '@/lib/crop';
+import { MIN_BOX, MIN_DRAG_PX, isDrawnBox, normaliseBox, type CropBox } from '@/lib/crop';
 import { createId } from '@/lib/id';
 import { cn } from '@/lib/cn';
 import { pluralize } from '@/lib/format';
@@ -15,7 +15,29 @@ export type Edge = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 type Drag =
   | { mode: 'draw'; id: string; originX: number; originY: number }
   | { mode: 'move'; id: string; grabX: number; grabY: number }
-  | { mode: 'resize'; id: string; edge: Edge };
+  | { mode: 'resize'; id: string; edge: Edge }
+  | { mode: 'pan'; fromX: number; fromY: number; panX: number; panY: number };
+
+/**
+ * What one finger on the photo does.
+ *
+ * Drawing and panning both want the same gesture, and which one you want
+ * depends entirely on how far in you are: zoomed out you are composing, so a
+ * drag is a box; zoomed in you are refining an edge you can finally see, so a
+ * drag is the photo moving under it. Before this, a one-finger drag was always
+ * a new box — which meant that at 6x the only way to reach another part of the
+ * picture was to pinch out and pinch back in, and the whole "precision comes
+ * from zoom" argument this component is built on collapsed the moment you took
+ * it up on the offer.
+ *
+ * So the mode follows the zoom, and the toggle SHOWS which one is live rather
+ * than leaving it to be discovered. Touching the toggle pins it, because a
+ * control that quietly overrules the person using it is worse than no control.
+ */
+export type Mode = 'draw' | 'pan';
+
+/** Past this the photo is being examined rather than framed, so a drag pans. */
+const PAN_FROM_ZOOM = 1.05;
 
 interface Pinch {
   distance: number;
@@ -90,13 +112,20 @@ export function MultiCrop({
   const [active, setActive] = useState<string | null>(null);
   const [shape, setShape] = useState<number | null>(null);
   const [loupe, setLoupe] = useState<{ x: number; y: number } | null>(null);
+  /** The box being drawn right now — the only one not yet held to the tap test. */
+  const [drawingId, setDrawingId] = useState<string | null>(null);
+  /** Set once somebody uses the toggle, after which the zoom stops deciding. */
+  const [pinnedMode, setPinnedMode] = useState<Mode | null>(null);
 
   const drag = useRef<Drag | null>(null);
   const pinch = useRef<Pinch | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const lastTap = useRef(0);
-  const grew = useRef(false);
+  /** Whether this gesture has travelled far enough to be a drag and not a tap. */
+  const moved = useRef(false);
   const frame = useRef<HTMLDivElement>(null);
+
+  const mode: Mode = pinnedMode ?? (zoom > PAN_FROM_ZOOM ? 'pan' : 'draw');
 
   useEffect(() => {
     const objectUrl = URL.createObjectURL(file);
@@ -162,8 +191,8 @@ export function MultiCrop({
       const height = image.height * fit * wanted;
       setZoom(wanted);
       setPan({
-        x: screenX - fx * width - (viewport.width - width) / 2,
-        y: screenY - fy * height - (viewport.height - height) / 2,
+        x: clampPan(viewport.width, width, screenX - fx * width - (viewport.width - width) / 2),
+        y: clampPan(viewport.height, height, screenY - fy * height - (viewport.height - height) / 2),
       });
     },
     [displayWidth, displayHeight, originX, originY, image, fit, viewport],
@@ -173,8 +202,11 @@ export function MultiCrop({
 
   function begin(event: React.PointerEvent, state: Drag) {
     drag.current = state;
-    setActive(state.id);
-    setLoupe(state.mode === 'move' ? null : toFraction(event.clientX, event.clientY));
+    moved.current = false;
+    if (state.mode !== 'pan') {
+      setActive(state.id);
+      setLoupe(state.mode === 'move' ? null : toFraction(event.clientX, event.clientY));
+    }
     (event.target as Element).setPointerCapture?.(event.pointerId);
   }
 
@@ -190,15 +222,31 @@ export function MultiCrop({
       const half = drag.current;
       if (half?.mode === 'draw') setBoxes((current) => current.filter((box) => box.id !== half.id));
       drag.current = null;
+      setDrawingId(null);
       setLoupe(null);
       startPinch();
       return;
     }
     if (pointers.current.size > 1 || event.button !== 0) return;
+
+    // Zoomed in, one finger drags the photo. The handles on an existing box
+    // stop propagation before they get here, so refining an edge still works
+    // exactly as it did — which is the whole reason to be zoomed in.
+    if (mode === 'pan') {
+      begin(event, {
+        mode: 'pan',
+        fromX: event.clientX,
+        fromY: event.clientY,
+        panX: pan.x,
+        panY: pan.y,
+      });
+      return;
+    }
+
     const { x, y } = toFraction(event.clientX, event.clientY);
     const id = createId('box');
-    grew.current = false;
     setBoxes((current) => [...current, { id, x, y, width: 0, height: 0 }]);
+    setDrawingId(id);
     begin(event, { mode: 'draw', id, originX: x, originY: y });
   }
 
@@ -232,8 +280,8 @@ export function MultiCrop({
       setZoom(next);
       // Pan comes free: the midpoint moving IS the drag.
       setPan({
-        x: mid.x - gesture.fx * width - (viewport.width - width) / 2,
-        y: mid.y - gesture.fy * height - (viewport.height - height) / 2,
+        x: clampPan(viewport.width, width, mid.x - gesture.fx * width - (viewport.width - width) / 2),
+        y: clampPan(viewport.height, height, mid.y - gesture.fy * height - (viewport.height - height) / 2),
       });
       return;
     }
@@ -241,6 +289,18 @@ export function MultiCrop({
     const state = drag.current;
     if (!state) return;
     event.preventDefault();
+
+    if (state.mode === 'pan') {
+      const dx = event.clientX - state.fromX;
+      const dy = event.clientY - state.fromY;
+      if (Math.hypot(dx, dy) >= MIN_DRAG_PX) moved.current = true;
+      setPan({
+        x: clampPan(viewport.width, displayWidth, state.panX + dx),
+        y: clampPan(viewport.height, displayHeight, state.panY + dy),
+      });
+      return;
+    }
+
     const { x, y } = toFraction(event.clientX, event.clientY);
     if (state.mode !== 'move') setLoupe({ x, y });
 
@@ -249,9 +309,7 @@ export function MultiCrop({
         if (box.id !== state.id) return box;
         if (state.mode === 'draw') {
           const drawn = draw(box, state.originX, state.originY, x, y, ratio);
-          if (Math.abs(drawn.width) >= MIN_BOX && Math.abs(drawn.height) >= MIN_BOX) {
-            grew.current = true;
-          }
+          if (isDrawnBox(drawn, displayWidth, displayHeight)) moved.current = true;
           return drawn;
         }
         if (state.mode === 'resize') return resize(box, state.edge, x, y, ratio);
@@ -270,16 +328,29 @@ export function MultiCrop({
     if (pointers.current.size === 1) startPinch();
 
     const state = drag.current;
-    if (pointers.current.size === 0) drag.current = null;
+    if (pointers.current.size === 0) {
+      drag.current = null;
+      setDrawingId(null);
+    }
     setLoupe(null);
     if (!state) return;
 
-    // A drag that never grew is a tap, and two taps in a row are a zoom.
+    /*
+     * Only the box this gesture drew is held to the tap test, and only against
+     * the screen it was drawn on. Every other box is kept exactly as it is,
+     * however small — a ring or a pair of earrings is a legitimately tiny box,
+     * and the old rule threw all of them away for looking like stray taps.
+     */
+    const drawnId = state.mode === 'draw' ? state.id : null;
     setBoxes((current) =>
-      current.map(normaliseBox).filter((box) => box.width >= MIN_BOX && box.height >= MIN_BOX),
+      current
+        .map(normaliseBox)
+        .filter((box) => box.id !== drawnId || isDrawnBox(box, displayWidth, displayHeight)),
     );
 
-    if (state.mode !== 'draw' || grew.current) return;
+    // A gesture that never travelled is a tap, and two taps in a row are a
+    // zoom. True in both modes: panning leaves no box behind to stand in for it.
+    if ((state.mode !== 'draw' && state.mode !== 'pan') || moved.current) return;
     const now = Date.now();
     if (now - lastTap.current < 320) {
       const point = local(event.clientX, event.clientY);
@@ -303,7 +374,11 @@ export function MultiCrop({
   const imageAspect = image.width && image.height ? image.width / image.height : 1;
   const ratio = shape === null ? null : shape / imageAspect;
 
-  const ready = boxes.filter((box) => box.width >= MIN_BOX && box.height >= MIN_BOX);
+  // Everything except the box under the finger, which has not yet been asked
+  // whether it is a drawing or a tap.
+  const ready = boxes.filter(
+    (box) => box.id !== drawingId || isDrawnBox(box, displayWidth, displayHeight),
+  );
   const selected = ready.find((box) => box.id === active) ?? null;
   const toScreen = (box: CropBox) => ({
     left: originX + box.x * displayWidth,
@@ -355,7 +430,10 @@ export function MultiCrop({
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onWheel={onWheel}
-          className="absolute inset-0 touch-none overflow-hidden select-none"
+          className={cn(
+            'absolute inset-0 touch-none overflow-hidden select-none',
+            mode === 'pan' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair',
+          )}
         >
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element -- blob: URL
@@ -417,9 +495,11 @@ export function MultiCrop({
               <div
                 key={box.id}
                 data-piece={index + 1}
+                // The one under the finger, not "is anything selected" — which
+                // lit every box at once and disagreed with its own handles.
                 className={cn(
                   'absolute border-2',
-                  selected ? 'border-[var(--brand)]' : 'border-white/90',
+                  isActive ? 'border-[var(--brand)]' : 'border-white/90',
                 )}
                 style={rect}
                 onPointerDown={(event) => {
@@ -505,8 +585,16 @@ export function MultiCrop({
           ) : null}
         </div>
 
-        {/* Zoom, for one hand and for a mouse. */}
+        {/* What a finger does, then zoom — for one hand and for a mouse. */}
         <div className="pointer-events-none absolute right-3 bottom-3 flex flex-col items-end gap-1.5">
+          <div className="pointer-events-auto flex flex-col overflow-hidden rounded-full bg-black/55">
+            <ModeButton label="Draw boxes" active={mode === 'draw'} onClick={() => setPinnedMode('draw')}>
+              <Crop size={15} />
+            </ModeButton>
+            <ModeButton label="Move the photo" active={mode === 'pan'} onClick={() => setPinnedMode('pan')}>
+              <Hand size={15} />
+            </ModeButton>
+          </div>
           {zoom > 1.02 ? (
             <span className="rounded-full bg-black/55 px-2 py-0.5 text-[0.6875rem] font-semibold text-white tabular-nums">
               {zoom.toFixed(1)}×
@@ -589,7 +677,9 @@ export function MultiCrop({
           </div>
         ) : (
           <p className="mb-2.5 text-center text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
-            Each box becomes its own item. Pinch to zoom, drag any edge to adjust.
+            {mode === 'pan'
+              ? 'Zoomed in, dragging moves the photo. Handles still resize — tap the crop icon to draw another box.'
+              : 'Each box becomes its own item. Pinch to zoom, drag any edge to adjust.'}
           </p>
         )}
         <Button
@@ -602,6 +692,34 @@ export function MultiCrop({
         </Button>
       </div>
     </div>
+  );
+}
+
+/** The live mode, shown rather than left to be inferred from behaviour. */
+function ModeButton({
+  label,
+  active,
+  onClick,
+  children,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'grid size-10 place-items-center transition-colors',
+        active ? 'bg-white text-black' : 'text-white active:bg-white/20',
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -631,6 +749,19 @@ function place(view: number, display: number, pan: number): number {
   if (!display) return 0;
   if (display <= view) return (view - display) / 2;
   return Math.min(0, Math.max(view - display, (view - display) / 2 + pan));
+}
+
+/**
+ * Hold pan inside the range `place` would honour.
+ *
+ * Without this, dragging past the edge banks slack that has to be paid back
+ * before the photo moves again — you push right, nothing happens for an inch,
+ * and the control feels broken rather than bounded.
+ */
+export function clampPan(view: number, display: number, pan: number): number {
+  if (!display || display <= view) return 0;
+  const slack = (display - view) / 2;
+  return Math.max(-slack, Math.min(slack, pan));
 }
 
 function clamp01(value: number): number {

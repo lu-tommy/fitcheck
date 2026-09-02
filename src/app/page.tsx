@@ -355,7 +355,7 @@ export default function HomePage() {
            */
           <section className="-mx-5">
             <div className="flex items-baseline justify-between px-5">
-              <p className="text-label text-[var(--text-faint)]">Suggested for today</p>
+              <p className="text-label text-[var(--text-faint)]">Outfit of the Day</p>
               <Link
                 href="/generate"
                 className="pressable -my-3 px-1.5 py-3 text-[0.8125rem] font-medium text-[var(--brand)]"

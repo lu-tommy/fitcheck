@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { draw, resize } from '@/components/closet/MultiCrop';
-import { CROP_ASPECT, MIN_BOX, cropFrame } from '@/lib/crop';
+import { clampPan, draw, resize } from '@/components/closet/MultiCrop';
+import { CROP_ASPECT, MIN_BOX, cropFrame, isDrawnBox } from '@/lib/crop';
 
 const box = { id: 'b', x: 0.2, y: 0.2, width: 0.4, height: 0.4 };
 
@@ -147,5 +147,69 @@ describe('draw', () => {
     expect(backwards.width).toBeLessThan(0);
     expect(backwards.height).toBeLessThan(0);
     expect(backwards.width / backwards.height).toBeCloseTo(1 / 2, 3);
+  });
+});
+
+/**
+ * The minimum used to be 3% of the SOURCE PHOTO, and it doubled as the test for
+ * "was that a drag or a tap?". That made it a minimum garment size by accident:
+ * a ring, a pair of earrings or a watch face is smaller than 3% of a photo, so
+ * a box drawn carefully around one was deleted the instant the finger lifted.
+ * Zooming could not help, because the threshold never looked at the screen.
+ */
+describe('isDrawnBox', () => {
+  // A 1200px-wide photo fitted to a 400px-wide phone frame.
+  const fitted = { w: 400, h: 500 };
+
+  it('keeps a box that is small on the photo but real on the screen', () => {
+    // 4% of the frame — a ring on a table — is 16 screen pixels. A real box.
+    const ring = { id: 'r', x: 0.4, y: 0.4, width: 0.04, height: 0.04 };
+    expect(isDrawnBox(ring, fitted.w, fitted.h)).toBe(true);
+  });
+
+  it('still discards the speck a stray tap leaves behind', () => {
+    const speck = { id: 's', x: 0.5, y: 0.5, width: 0.004, height: 0.004 };
+    expect(isDrawnBox(speck, fitted.w, fitted.h)).toBe(false);
+  });
+
+  it('lets zooming in rescue a box that was too small to draw', () => {
+    const earring = { id: 'e', x: 0.5, y: 0.5, width: 0.01, height: 0.01 };
+    // Fitted, that is 4 screen pixels — indistinguishable from a tap.
+    expect(isDrawnBox(earring, fitted.w, fitted.h)).toBe(false);
+    // Zoomed to 6x it is 24, which is a deliberate gesture. This is the whole
+    // point of pinch-zoom, and the old rule ignored it entirely.
+    expect(isDrawnBox(earring, fitted.w * 6, fitted.h * 6)).toBe(true);
+  });
+
+  it('reads a box drawn up and to the left, which has negative sides', () => {
+    const backwards = { id: 'b', x: 0.6, y: 0.6, width: -0.2, height: -0.2 };
+    expect(isDrawnBox(backwards, fitted.w, fitted.h)).toBe(true);
+  });
+
+  it('leaves MIN_BOX as nothing but a floor against inversion', () => {
+    // Small enough that no real garment box ever meets it from above.
+    expect(MIN_BOX).toBeLessThan(0.01);
+  });
+});
+
+/**
+ * Panning used to bank slack: dragging past the edge kept accumulating into
+ * `pan` while `place` clamped what was drawn, so pushing back the other way did
+ * nothing for an inch and the photo felt stuck rather than bounded.
+ */
+describe('clampPan', () => {
+  it('holds pan inside the slack the photo actually has', () => {
+    // A 1200px photo in a 400px frame has 800px of overhang, 400 each side.
+    expect(clampPan(400, 1200, 5000)).toBe(400);
+    expect(clampPan(400, 1200, -5000)).toBe(-400);
+  });
+
+  it('leaves a pan that is already inside alone', () => {
+    expect(clampPan(400, 1200, 120)).toBe(120);
+  });
+
+  it('pins a photo that fits, because there is nowhere to go', () => {
+    expect(clampPan(400, 300, 90)).toBe(0);
+    expect(clampPan(400, 0, 90)).toBe(0);
   });
 });

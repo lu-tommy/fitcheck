@@ -26,13 +26,49 @@ export interface CropBox {
 export const CROP_ASPECT = 4 / 5;
 
 /**
- * The smallest box worth keeping, as a fraction of the photo.
+ * The smallest a box may become mid-gesture, as a fraction of the photo.
  *
- * It doubles as the test for "was that a drag or a tap?", so it cannot go much
- * lower without stray taps leaving specks behind. With pinch-zoom, a small
- * piece is framed by zooming in rather than by drawing a tiny box.
+ * This is a geometric floor and nothing more: it stops an edge being dragged
+ * past its opposite one and turning the box inside out, which would rename its
+ * own handles halfway through a drag.
+ *
+ * It used to be 0.03 and to double as the test for "was that a drag or a tap?",
+ * which quietly turned it into a minimum GARMENT size — and 3% of a photo is a
+ * large object. A ring, a pair of earrings or a watch face shot from a normal
+ * distance is smaller than that, so a box drawn carefully around one was
+ * deleted the moment the finger lifted, with no message and nothing to appeal
+ * to. Zooming could not rescue it either: the threshold is in fractions of the
+ * source, so magnifying ten times changes how precisely you can draw and not
+ * one thing about what survives.
+ *
+ * The drag-or-tap question is now asked in screen pixels, where it belongs.
  */
-export const MIN_BOX = 0.03;
+export const MIN_BOX = 0.002;
+
+/**
+ * How far a finger must travel before it is drawing rather than tapping, in
+ * screen pixels. Below this the press is a tap — which selects, and which pairs
+ * up into the double-tap zoom — and leaves nothing behind.
+ */
+export const MIN_DRAG_PX = 12;
+
+/**
+ * Whether a box is something drawn or the residue of a tap.
+ *
+ * The question is about the gesture, so it is asked in the units the gesture
+ * happened in. Asking it in fractions of the photo is what made a tiny garment
+ * indistinguishable from a stray tap.
+ */
+export function isDrawnBox(
+  box: CropBox,
+  displayWidth: number,
+  displayHeight: number,
+): boolean {
+  return (
+    Math.abs(box.width) * displayWidth >= MIN_DRAG_PX &&
+    Math.abs(box.height) * displayHeight >= MIN_DRAG_PX
+  );
+}
 
 export function normaliseBox(box: CropBox): CropBox {
   const x = Math.min(box.x, box.x + box.width);
