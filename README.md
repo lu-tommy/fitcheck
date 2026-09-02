@@ -465,6 +465,32 @@ Four rules hold this honest, and they are the feature:
   not *not ever*, and treating them the same teaches the app to hide clothes
   somebody likes for reasons it invented.
 
+## How the whole wardrobe scores
+
+The Fit Score judges one outfit, which answers *is this good* and never *why is
+getting dressed hard on Tuesdays*. The second is the more useful question: it is
+a fact about the wardrobe rather than about a morning, and it is the only one of
+the two anybody can act on when they are next in a shop.
+
+So `domain/wardrobeReport` dresses the wardrobe against itself — every top
+against every bottom, each dress on its own — scores each outfit exactly the way
+the home screen scores today, and reads it backwards. The average, the best
+pairing, the pieces that lift whatever they are put with, and the pieces that
+are harder to place. The pairing is quadratic, so it is capped at twelve a side
+by wear count: a hundred and forty-four builds, which runs in a blink.
+
+**A piece is never called bad.** "Harder to place" is the accurate statement as
+well as the kind one — a garment scores low because of what is *around* it in
+this particular wardrobe, and the same coat in a different closet would be fine.
+
+The reason it names took two goes to get right. Naming the deduction that fired
+most often around a piece produces nonsense: a closet with no jackets loses the
+third-piece mark on *every* outfit, so reporting it against one garment says
+nothing about that garment. What earns a mention is a rule that fires **more
+around this piece than it fires everywhere else** — which for a pair of tuxedo
+trousers in a casual wardrobe is *"usually because it is dressier or plainer
+than what it goes with"*, and that is a sentence somebody can do something with.
+
 ## Care instructions
 
 Each item can carry its label — wash, cycle, dry, iron, bleach, plus the short

@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { ItemImage } from '@/components/closet/ItemImage';
 import { PageHeader } from '@/components/PageHeader';
 import { BarRow, StatTile } from '@/components/stats/Bars';
+import { WardrobeScore } from '@/components/stats/WardrobeScore';
 import { ButtonLink } from '@/components/ui/Button';
 import { EmptyState, SectionHeader } from '@/components/ui/Feedback';
 import { computeStats } from '@/domain/stats';
@@ -60,6 +61,13 @@ export default function StatsPage() {
               : 'Everything in your closet has been worn at least once.'}
           </p>
         </section>
+
+        {/*
+          * Above the counts on purpose. How many things you own is inventory;
+          * how they score together is the only figure on this screen anybody
+          * can act on.
+          */}
+        <WardrobeScore />
 
         <section className="grid grid-cols-2 gap-3">
           <StatTile label="Pieces" value={String(stats.totalItems)} />
