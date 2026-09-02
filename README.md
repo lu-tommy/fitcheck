@@ -409,6 +409,31 @@ That needed three facts the wardrobe never held: `fit`, `length` and `rise`, plu
 only offered on a garment that can answer it — a pair of sunglasses is never
 asked how it is cut.
 
+### Answering what it could not judge
+
+Saying *"say how the indigo jeans fit"* on every outfit is honest and, on its
+own, a nag: a request with no route to acting on it turns every morning into a
+reminder of a chore with no beginning. Tapping that line — or the prompt at the
+top of the closet — opens the queue.
+
+One garment at a time, only the questions it can answer, and the ones you
+actually wear first: the order is weighted by whether the piece sets an outfit's
+proportions at all, how often it is worn, and whether it is a favourite. Log
+scale on the wear count, so the jeans you live in come before a scarf worn once
+without burying the rest of the wardrobe beneath them. Answering the last
+question moves on by itself, because the constraint is the number of taps — a
+form that opens, scrolls, saves and closes forty times is the setup grind people
+abandon these apps over, and it does not become acceptable for happening later.
+
+**There is no "guess them all" button, and that is deliberate.** A garment's cut
+was a candidate for inference — the silhouette module already measures how a
+mask narrows at the waist, and a boxy tee laid flat really does differ from a
+tapered one. It does not survive where cut-outs now come from: the parser reads
+a garment being *worn*, so the outline is the shape of the person inside it and
+the difference between fitted and oversized is drape, not width. A wrong fact
+here would silently corrupt the rules the queue exists to switch on. Fast and
+true beats instant and wrong.
+
 ## What it learns about you
 
 Every wardrobe app claims to learn your style and almost none can tell you what

@@ -1,10 +1,19 @@
 'use client';
 
-import { Archive, ChevronRight, Plus, Search, SlidersHorizontal, Shirt } from 'lucide-react';
+import {
+  Archive,
+  ChevronRight,
+  Plus,
+  Ruler,
+  Search,
+  Shirt,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ItemTile } from '@/components/closet/ItemTile';
 import { PageHeader } from '@/components/PageHeader';
+import { readShapeGaps, shapeProgress } from '@/domain/wardrobeGaps';
 import Link from 'next/link';
 
 import { ButtonLink, Button } from '@/components/ui/Button';
@@ -124,6 +133,8 @@ export default function ClosetPage() {
       />
 
       <div className="px-5">
+        <ShapePrompt />
+
         <div className="flex gap-2">
           <div className="relative min-w-0 flex-1">
             <Search
@@ -392,5 +403,46 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
       <h3 className="text-label mb-2 text-[var(--text-muted)]">{title}</h3>
       <div className="flex flex-wrap gap-2">{children}</div>
     </div>
+  );
+}
+
+/**
+ * The way into the shape queue, from where the garments are.
+ *
+ * Only shown while there is something to ask, and it names the count rather
+ * than nagging in the abstract — a banner that says "improve your wardrobe
+ * data" is one people learn to look past within a week.
+ */
+function ShapePrompt() {
+  const items = useActiveItems();
+  const report = useMemo(() => readShapeGaps(items), [items]);
+  const progress = useMemo(() => shapeProgress(items), [items]);
+
+  if (report.queue.length === 0) return null;
+
+  return (
+    <Link
+      href="/closet/shape"
+      className="card pressable mb-3 flex items-center gap-3 p-3.5"
+    >
+      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
+        <Ruler size={18} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[0.9375rem] font-medium">
+          {pluralize(report.queue.length, 'garment')} to describe
+        </span>
+        <span className="mt-1 block h-1 overflow-hidden rounded-full bg-[var(--surface-alt)]">
+          <span
+            className="block h-full rounded-full bg-[var(--brand)]"
+            style={{ width: `${Math.round(progress * 100)}%` }}
+          />
+        </span>
+        <span className="mt-1.5 block text-[0.8125rem] leading-snug text-[var(--text-muted)]">
+          It unlocks the proportion and pattern rules in the Fit Score.
+        </span>
+      </span>
+      <ChevronRight size={17} className="shrink-0 text-[var(--text-faint)]" />
+    </Link>
   );
 }
