@@ -7,6 +7,7 @@ import {
   Shirt,
   Sparkles,
   Share2,
+  Flame,
   Shuffle,
   Undo2,
   WashingMachine,
@@ -27,6 +28,7 @@ import { Button, ButtonLink } from '@/components/ui/Button';
 import { EmptyState, SectionHeader } from '@/components/ui/Feedback';
 import { scoreOutfit } from '@/domain/fitScore';
 import { pinIsUsable, pinMatches } from '@/domain/ootd';
+import { readStreak } from '@/domain/streak';
 import { readTaste } from '@/domain/taste';
 import { buildOutfitLocally, cycleSlot, slotAlternatives } from '@/domain/outfitEngine';
 import { demoWardrobe } from '@/domain/seed';
@@ -102,6 +104,13 @@ export default function HomePage() {
    * colour notes all describe what is on screen — see domain/ootd for why an
    * outfit with a name must not change between breakfast and the front door.
    */
+  /*
+   * The count is of LOGGING, never of dressing differently. See domain/streak:
+   * a streak that rewards new outfits teaches somebody that repeating a jumper
+   * is a failure, which is the exact pressure this app exists to remove.
+   */
+  const streak = useMemo(() => readStreak(wearLogs, today), [wearLogs, today]);
+
   const taste = useMemo(
     () => readTaste(signals, items, wearLogs, today, preferences.dismissedObservations),
     [signals, items, wearLogs, today, preferences.dismissedObservations],
@@ -395,6 +404,12 @@ export default function HomePage() {
                   layout={wornOutfit?.layout}
                   onSelect={(item) => router.push(`/closet/${item.id}`)}
                 />
+                {streak.current > 1 ? (
+                  <p className="mt-3 flex items-start gap-2 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
+                    <Flame size={15} className="mt-0.5 shrink-0 text-[var(--warning)]" />
+                    <span>{streak.note}</span>
+                  </p>
+                ) : null}
                 <p className="mt-3 text-[0.875rem] leading-relaxed text-[var(--text-muted)]">
                   {pluralize(wornItems.length, 'piece')} logged.{' '}
                   {wornInTheWash
@@ -546,6 +561,21 @@ export default function HomePage() {
           asked for before the app has shown anything are two chores stacked in
           front of the first thing she opened it to see.
         */}
+        {items.length && streak.current > 0 && !streak.loggedToday ? (
+          <div className="card flex items-start gap-3 p-4">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--warning-soft)] text-[var(--warning)]">
+              <Flame size={19} />
+            </span>
+            <p className="min-w-0 flex-1 text-[0.875rem] leading-relaxed">
+              <span className="block font-medium">{streak.note}</span>
+              <span className="mt-0.5 block text-[var(--text-muted)]">
+                {streak.thisWeek} of the last 7 days
+                {streak.longest > streak.current ? ` · best run ${streak.longest}` : ''}
+              </span>
+            </p>
+          </div>
+        ) : null}
+
         {items.length ? <WeatherCard /> : null}
         <SafetyCard />
 

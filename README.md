@@ -523,6 +523,27 @@ poster of it, and **Share** renders the grid as one picture. The button only
 appears where there is something to show: four looks is a feature and two is an
 apology, so the count is taken before the button rather than after it is pressed.
 
+## Streaks, on the right thing
+
+Streaks are the cheapest retention mechanic there is and the easiest to point at
+the wrong behaviour. A streak counting *new outfits* teaches somebody that
+repeating a jumper is a failure — which is exactly the pressure this app exists
+to remove, and it would be doing it in the name of engagement. That version is
+not built here and should not be later.
+
+What is counted is **logging**. It costs one tap, it can be satisfied by wearing
+precisely what you wore yesterday, and every log feeds the wear history, the
+cost per wear, the memories and the taste model — so rewarding it rewards the
+thing that makes the rest of the app work. The copy says so outright, on the
+screen most likely to imply otherwise: *"Wearing the same jeans counts — that is
+rather the point."*
+
+Two kindnesses in the arithmetic. A run stays alive until the day after a missed
+one, so opening the app at breakfast never shows a streak just broken by not
+having got dressed yet. And the week is reported next to the run, because five
+days out of seven is a good week and a broken streak, and a screen that only
+knows how to say the second thing is lying by omission.
+
 ## Care instructions
 
 Each item can carry its label — wash, cycle, dry, iron, bleach, plus the short
