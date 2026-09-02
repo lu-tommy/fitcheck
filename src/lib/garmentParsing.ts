@@ -4,8 +4,10 @@ import {
   ATR_LABELS,
   describeEmptyParse,
   labelMapFromMasks,
+  regionMask,
   regionsFromLabelMap,
   type GarmentRegion,
+  type RegionMask,
 } from '@/domain/garmentClasses';
 
 /**
@@ -71,8 +73,19 @@ export interface ParseProgress {
   message: string;
 }
 
+/**
+ * A region, plus the garment's own outline.
+ *
+ * The mask is the expensive half of the work and keeping only the rectangle
+ * throws it away — it is also the half that settles the cut-out a flood fill
+ * structurally cannot do, on a photo of somebody wearing the clothes.
+ */
+export interface ParsedGarment extends GarmentRegion {
+  mask: RegionMask | null;
+}
+
 export type ParseOutcome =
-  | { ok: true; regions: GarmentRegion[]; ranOn: 'webgpu' | 'wasm' }
+  | { ok: true; regions: ParsedGarment[]; ranOn: 'webgpu' | 'wasm' }
   | { ok: false; message: string };
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- the pipeline is loaded at runtime */
@@ -206,7 +219,14 @@ export async function parseGarments(
       return { ok: false, message: describeEmptyParse(masks.length > 0) };
     }
 
-    return { ok: true, regions, ranOn };
+    return {
+      ok: true,
+      regions: regions.map((region) => ({
+        ...region,
+        mask: regionMask(labels, width, height, region),
+      })),
+      ranOn,
+    };
   } catch (error) {
     const reason = (error as Error)?.message ?? '';
     return {

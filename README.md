@@ -318,6 +318,16 @@ how it is wired in, which are the reason it is a button and not a default:
   import, so it is a 504 KB chunk that people who never turn it on never fetch,
   and every failure resolves to a sentence rather than a rejected promise.
 
+It also settles the cut-out. The flood fill seeds from the edges of a crop and
+spreads through anything similar, which works against a plain wall and *cannot*
+work against a person: a crop off a mirror selfie has skin, a room and a phone
+around the garment, so the fill takes half an arm with it. That is why cropping
+deliberately never ran it. A mask trained to tell a sleeve from an arm has no
+such difficulty — so a parsed piece arrives already cut to its own outline, on a
+transparent ground, the way the drawn demo wardrobe does, and the fill is not
+run at all. A belt crossing a pair of trousers is a hole in the trousers' mask
+rather than a smear across it.
+
 The judgement lives in `domain/garmentClasses` with no model in it at all: given
 a label map, which regions are garments, where each box goes, and how far the
 label should be believed. That is why it can be tested against a mask drawn by

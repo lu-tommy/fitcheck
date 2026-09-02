@@ -43,6 +43,16 @@ import { pluralize } from '@/lib/format';
  */
 export interface DrawnBox extends CropBox {
   suggestion?: { category: Category; label: string; confidence: number };
+  /**
+   * The garment's own outline, when a parser drew the box.
+   *
+   * Kept beside the box rather than folded into it, because the two answer
+   * different questions: the box says what to cut, and this says what of it is
+   * cloth. A box dragged by hand afterwards keeps its mask, which then covers
+   * slightly the wrong region — so the crop stretches it to whatever box it
+   * ends up with rather than assuming the two still agree.
+   */
+  mask?: { data: ArrayLike<number>; width: number; height: number };
 }
 
 /** Which edges a handle moves. Corners move two. */
@@ -250,6 +260,7 @@ export function MultiCrop({
         label: region.label,
         confidence: region.confidence,
       },
+      mask: region.mask ?? undefined,
     }));
     setBoxes((current) => [...current, ...found]);
     setActive(found[0]?.id ?? null);

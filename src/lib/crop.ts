@@ -157,10 +157,24 @@ export function cropFrame(
   };
 }
 
+/**
+ * The garment's own outline, at whatever resolution it was measured.
+ *
+ * Given, the crop comes back as a transparent PNG cut to this shape instead of
+ * a rectangle. Covers exactly the drawn box, so it is stretched to the region
+ * rather than positioned within it.
+ */
+export interface CropMask {
+  data: ArrayLike<number>;
+  width: number;
+  height: number;
+}
+
 export async function cropToBlob(
   source: ImageBitmap,
   box: CropBox,
   maxDimension = 1200,
+  mask?: CropMask,
 ): Promise<Blob> {
   const safe = normaliseBox(box);
   const plan = cropFrame(safe, source.width, source.height, maxDimension);
@@ -169,21 +183,73 @@ export async function cropToBlob(
   const canvas = document.createElement('canvas');
   canvas.width = outWidth;
   canvas.height = outHeight;
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext('2d', { willReadFrequently: Boolean(mask) });
   if (!context) throw new Error('This browser cannot crop images');
 
-  // Fill first, so any part of the frame that falls outside the photo is a
-  // plausible backdrop instead of a black band.
-  context.fillStyle = await borderColor(source, safe);
-  context.fillRect(0, 0, outWidth, outHeight);
+  // A cut-out keeps a transparent ground; a rectangle gets a plausible backdrop
+  // wherever the tile-shaped frame reaches past the photo, rather than a black
+  // band that reads as damage.
+  if (!mask) {
+    context.fillStyle = await borderColor(source, safe);
+    context.fillRect(0, 0, outWidth, outHeight);
+  }
 
   context.drawImage(source, sx, sy, sw, sh, plan.left, plan.top, sw * scale, sh * scale);
+
+  if (mask) {
+    applyMask(context, plan, mask);
+    return canvasToPng(canvas);
+  }
 
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, 'image/jpeg', 0.86),
   );
   if (!blob) throw new Error('Could not save the crop');
   return blob;
+}
+
+/**
+ * Punch the garment's shape out of the tile.
+ *
+ * Only the region the box covers is touched — the rest of the tile is frame,
+ * and was already transparent. Nearest-neighbour sampling is deliberate: the
+ * mask is a statement about which pixels are cloth, and interpolating it would
+ * invent half-cloth pixels along every edge that no rule downstream knows how
+ * to read.
+ */
+function applyMask(
+  context: CanvasRenderingContext2D,
+  plan: CropPlan,
+  mask: CropMask,
+): void {
+  const left = Math.round(plan.left);
+  const top = Math.round(plan.top);
+  const width = Math.max(1, Math.round(plan.sw * plan.scale));
+  const height = Math.max(1, Math.round(plan.sh * plan.scale));
+  if (left >= context.canvas.width || top >= context.canvas.height) return;
+
+  const region = context.getImageData(left, top, width, height);
+  const { data } = region;
+
+  for (let y = 0; y < height; y += 1) {
+    const my = Math.min(mask.height - 1, Math.floor((y / height) * mask.height));
+    for (let x = 0; x < width; x += 1) {
+      const mx = Math.min(mask.width - 1, Math.floor((x / width) * mask.width));
+      if (mask.data[my * mask.width + mx] > 127) continue;
+      data[(y * width + x) * 4 + 3] = 0;
+    }
+  }
+
+  context.putImageData(region, left, top);
+}
+
+function canvasToPng(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Could not save the crop'))),
+      'image/png',
+    ),
+  );
 }
 
 /** The average colour just inside the box edge — a decent stand-in for the backdrop. */

@@ -324,3 +324,57 @@ function clamp01(value: number): number {
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+/**
+ * The garment's own shape, cut out of the label map.
+ *
+ * The parse already knows which pixels are the jumper and which are the arm
+ * inside it — that is the entire reason it can read a photo of somebody
+ * wearing clothes. Throwing that away and keeping only the rectangle wastes the
+ * expensive half of the work.
+ *
+ * It also settles something the flood-fill cut-out structurally cannot. That
+ * one seeds from the edges of a crop and spreads through anything similar,
+ * which works against a plain wall and fails against a person: a crop taken
+ * from a mirror selfie has skin, a room and a phone around the garment, and the
+ * fill eats into the arm rather than stopping at the sleeve. A mask trained to
+ * tell a sleeve from an arm has no such difficulty.
+ *
+ * Returned at the label map's own resolution and cropped to the region, so the
+ * caller scales it to whatever tile it is painting.
+ */
+export interface RegionMask {
+  data: Uint8Array;
+  width: number;
+  height: number;
+}
+
+export function regionMask(
+  labels: ArrayLike<number>,
+  width: number,
+  height: number,
+  region: GarmentRegion,
+): RegionMask | null {
+  if (width <= 0 || height <= 0 || labels.length < width * height) return null;
+
+  const left = Math.max(0, Math.floor(region.box.x * width));
+  const top = Math.max(0, Math.floor(region.box.y * height));
+  const right = Math.min(width, Math.ceil((region.box.x + region.box.width) * width));
+  const bottom = Math.min(height, Math.ceil((region.box.y + region.box.height) * height));
+
+  const maskWidth = right - left;
+  const maskHeight = bottom - top;
+  if (maskWidth <= 0 || maskHeight <= 0) return null;
+
+  const data = new Uint8Array(maskWidth * maskHeight);
+  for (let y = 0; y < maskHeight; y += 1) {
+    const from = (top + y) * width + left;
+    const to = y * maskWidth;
+    for (let x = 0; x < maskWidth; x += 1) {
+      // Only this garment. A belt crossing a pair of trousers belongs to the
+      // belt's cut-out and must be a hole in the trousers', not a smear of it.
+      data[to + x] = garmentClassFor(labels[from + x])?.id === region.classId ? 255 : 0;
+    }
+  }
+  return { data, width: maskWidth, height: maskHeight };
+}

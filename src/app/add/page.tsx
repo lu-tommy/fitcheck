@@ -116,6 +116,17 @@ export default function AddPage() {
          * whatever the silhouette or the default says.
          */
         categories?: (Category | undefined)[];
+        /**
+         * Aligned with `accepted`: a cut-out already made, where one could be.
+         *
+         * The flood fill is seeded from the edges of a crop and spreads through
+         * anything similar, which works against a wall and fails against a
+         * person — a crop off a mirror selfie has skin and a room around the
+         * garment, and the fill takes half an arm with it. A mask from the
+         * parse has no such difficulty, so where there is one it is used and
+         * the fill is not run at all.
+         */
+        cutouts?: (Blob | undefined)[];
       },
     ) => {
       if (!accepted.length) return;
@@ -148,8 +159,14 @@ export default function AddPage() {
         const entry = seeded[index];
         try {
           const processed = await processPhoto(file);
+          /*
+           * Built on the SEEDED draft, not on a fresh empty one. The parser has
+           * already established what this garment is; starting over here would
+           * throw that away and put "T-shirt" back on a pair of trousers,
+           * which is precisely the correction the parse existed to save.
+           */
           const draft: ItemDraft = {
-            ...EMPTY_DRAFT,
+            ...entry.draft,
             primaryColor: processed.dominantName,
             primaryColorHex: processed.dominantHex,
             name: '',
@@ -159,7 +176,23 @@ export default function AddPage() {
             photo: { blob: processed.blob, width: processed.width, height: processed.height },
             draft,
           });
-          if (backgroundRemoval !== 'off') {
+          /*
+           * A cut-out from the parse is already the garment's own shape, taken
+           * by something that can tell a sleeve from an arm. Nothing the flood
+           * fill could add is worth the second or two, and running it would
+           * only give it the chance to eat into a clean result.
+           */
+          const parsed = options?.cutouts?.[index];
+          if (parsed) {
+            const shape = await createImageBitmap(parsed);
+            patch(entry.key, {
+              cutoutUrl: URL.createObjectURL(parsed),
+              cutout: { blob: parsed, width: shape.width, height: shape.height },
+              useCutout: true,
+              busyBackground: false,
+            });
+            shape.close();
+          } else if (backgroundRemoval !== 'off') {
             const cutout = await removeBackground(processed.blob, backgroundRemoval);
 
             /*
@@ -256,8 +289,17 @@ export default function AddPage() {
       try {
         const bitmap = await createImageBitmap(source, { imageOrientation: 'from-image' });
         const crops: Blob[] = [];
+        /*
+         * A box the parser drew comes with the garment's own outline, so the
+         * cut-out is taken here from a mask that knows a sleeve from an arm —
+         * rather than downstream from a flood fill that cannot, and that eats
+         * into the person instead. Boxes drawn by hand have no mask and go on
+         * behaving exactly as they did.
+         */
+        const cutouts: (Blob | undefined)[] = [];
         for (const box of boxes) {
           crops.push(await cropToBlob(bitmap, box));
+          cutouts.push(box.mask ? await cropToBlob(bitmap, box, 1200, box.mask) : undefined);
         }
         bitmap.close();
         // A crop taken FROM a queued row replaces it; the boxes are the piece now.
@@ -285,6 +327,7 @@ export default function AddPage() {
          */
         await ingest(crops, {
           autoCutout: false,
+          cutouts,
           origins: boxes.map((box) => ({ source, box })),
           // Only where the parser was actually sure. A confident wrong word in
           // a closet costs more than an empty field — the same rule the

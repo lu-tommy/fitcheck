@@ -7,6 +7,7 @@ import {
   describeEmptyParse,
   garmentClassFor,
   labelMapFromMasks,
+  regionMask,
   regionsFromLabelMap,
 } from '@/domain/garmentClasses';
 
@@ -223,5 +224,49 @@ describe('describeEmptyParse', () => {
     expect(describeEmptyParse(false)).toContain('flat lay');
     expect(describeEmptyParse(true)).toContain('by hand');
     expect(describeEmptyParse(false)).toContain('by hand');
+  });
+});
+
+/**
+ * The parse already knows which pixels are the jumper and which are the arm
+ * inside it. Keeping only the rectangle throws away the expensive half of the
+ * work — and it is the half the flood-fill cut-out structurally cannot do,
+ * because a fill seeded from the edge of a crop off a mirror selfie eats into
+ * the arm rather than stopping at the sleeve.
+ */
+describe('regionMask', () => {
+  it('returns the garment shape, cropped to its own box', () => {
+    const labels = paint([{ classId: TOP, x: 20, y: 20, w: 40, h: 40 }]);
+    const [region] = regionsFromLabelMap(labels, W, H);
+    const mask = regionMask(labels, W, H, region)!;
+
+    // The mask covers the padded box, and the garment sits inside it.
+    expect(mask.width).toBeGreaterThanOrEqual(40);
+    expect(mask.height).toBeGreaterThanOrEqual(40);
+    expect(mask.data).toHaveLength(mask.width * mask.height);
+
+    const opaque = mask.data.filter((value) => value > 0).length;
+    expect(opaque).toBe(40 * 40);
+  });
+
+  it('leaves a hole where another garment crosses it', () => {
+    // A belt across the middle of a pair of trousers.
+    const labels = paint([
+      { classId: PANTS, x: 20, y: 20, w: 40, h: 60 },
+      { classId: 8, x: 20, y: 45, w: 40, h: 6 },
+    ]);
+    const pants = regionsFromLabelMap(labels, W, H).find((entry) => entry.slot === 'bottom')!;
+    const mask = regionMask(labels, W, H, pants)!;
+
+    // The trousers' own mask does not claim the belt's pixels.
+    const opaque = mask.data.filter((value) => value > 0).length;
+    expect(opaque).toBe(40 * 60 - 40 * 6);
+  });
+
+  it('says nothing rather than guessing on a map it cannot read', () => {
+    const labels = paint([{ classId: TOP, x: 20, y: 20, w: 40, h: 40 }]);
+    const [region] = regionsFromLabelMap(labels, W, H);
+    expect(regionMask(new Uint8Array(4), W, H, region)).toBeNull();
+    expect(regionMask(labels, 0, 0, region)).toBeNull();
   });
 });
