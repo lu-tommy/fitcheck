@@ -31,27 +31,30 @@ type Shape =
   | 'dress' | 'jumpsuit' | 'suit'
   | 'sneaker' | 'boot' | 'derby' | 'sandal'
   | 'cap' | 'beanie' | 'hat'
+  | 'raincoat' | 'swimwear' | 'leggings' | 'flats' | 'welly' | 'umbrella'
   | 'watch' | 'belt' | 'necklace' | 'earrings' | 'bracelet' | 'ring' | 'brooch'
   | 'sunglasses' | 'scarf' | 'tie' | 'bowtie' | 'pocketsquare'
   | 'headband' | 'hairclip' | 'socks' | 'tights' | 'bag' | 'gloves';
 
 const SHAPE_OF: Record<Category, Shape> = {
   tshirt: 'tee', polo: 'polo', shirt: 'shirt', blouse: 'shirt', tank: 'tank',
-  longsleeve: 'longsleeve',
+  longsleeve: 'longsleeve', turtleneck: 'longsleeve',
   sweater: 'knit', hoodie: 'hoodie', cardigan: 'knit', vest: 'vest',
+  overshirt: 'shirt',
   jacket: 'blazer', blazer: 'blazer', coat: 'coat', parka: 'parka',
-  dress: 'dress', jumpsuit: 'jumpsuit', suit: 'suit',
+  raincoat: 'raincoat',
+  dress: 'dress', jumpsuit: 'jumpsuit', suit: 'suit', swimwear: 'swimwear',
   jeans: 'trousers', chinos: 'trousers', 'dress-pants': 'trousers',
-  shorts: 'shorts', joggers: 'joggers', skirt: 'skirt',
+  shorts: 'shorts', joggers: 'joggers', leggings: 'leggings', skirt: 'skirt',
   sneakers: 'sneaker', boots: 'boot', 'dress-shoes': 'derby', loafers: 'derby',
-  sandals: 'sandal',
+  sandals: 'sandal', flats: 'flats', 'rain-boots': 'welly',
   hat: 'hat', cap: 'cap', beanie: 'beanie',
   watch: 'watch', belt: 'belt', necklace: 'necklace', earrings: 'earrings',
   bracelet: 'bracelet', ring: 'ring', brooch: 'brooch',
   sunglasses: 'sunglasses', scarf: 'scarf', tie: 'tie', 'bow-tie': 'bowtie',
   'pocket-square': 'pocketsquare', headband: 'headband', 'hair-clip': 'hairclip',
   socks: 'socks', tights: 'tights', bag: 'bag',
-  gloves: 'gloves', other: 'bag',
+  gloves: 'gloves', umbrella: 'umbrella', other: 'bag',
 };
 
 /** What gets drawn: a filled silhouette, optional holes, optional stitch lines. */
@@ -634,6 +637,104 @@ function build(shape: Shape): Drawing {
       const lines = new Path2D();
       lines.moveTo(142, 144); lines.lineTo(258, 144);
       return { body: p, lines, stroke: 5 };
+    }
+
+    case 'raincoat': {
+      // A hood is the whole point of it, and the only thing that separates a
+      // raincoat from a coat at a glance.
+      const p = torso({ hem: 380, sleeve: 300, width: 92, neck: 30, shoulder: 126 });
+      p.moveTo(168, 118);
+      p.quadraticCurveTo(200, 62, 232, 118);
+      p.quadraticCurveTo(200, 100, 168, 118);
+      p.closePath();
+      const lines = new Path2D();
+      lines.moveTo(200, 130); lines.lineTo(200, 380);
+      for (let y = 200; y <= 320; y += 60) { lines.moveTo(190, y); lines.lineTo(210, y); }
+      return { body: p, lines, stroke: 4 };
+    }
+
+    case 'swimwear': {
+      // A one-piece: high leg, scooped front, thin straps.
+      const p = new Path2D();
+      p.moveTo(146, 140);
+      p.quadraticCurveTo(200, 190, 254, 140);
+      p.lineTo(268, 150);
+      p.quadraticCurveTo(292, 260, 246, 330);
+      p.quadraticCurveTo(200, 286, 154, 330);
+      p.quadraticCurveTo(108, 260, 132, 150);
+      p.closePath();
+      const lines = new Path2D();
+      lines.moveTo(150, 146); lines.quadraticCurveTo(200, 200, 250, 146);
+      return { body: p, lines, stroke: 4 };
+    }
+
+    case 'leggings': {
+      // Trouser-shaped and drawn tight to the leg, which is the difference.
+      const p = new Path2D();
+      p.moveTo(146, 112); p.lineTo(254, 112);
+      p.lineTo(246, 220); p.lineTo(236, 396); p.lineTo(210, 396);
+      p.lineTo(200, 246);
+      p.lineTo(190, 396); p.lineTo(164, 396); p.lineTo(154, 220);
+      p.closePath();
+      const lines = new Path2D();
+      lines.moveTo(148, 150); lines.lineTo(252, 150);
+      return { body: p, lines, stroke: 5 };
+    }
+
+    case 'flats': {
+      // Low, round, and no heel — which is the entire distinction from a pump.
+      const p = new Path2D();
+      p.moveTo(96, 300);
+      p.quadraticCurveTo(96, 250, 150, 250);
+      p.quadraticCurveTo(206, 250, 262, 276);
+      p.quadraticCurveTo(312, 296, 312, 316);
+      p.quadraticCurveTo(312, 336, 268, 336);
+      p.lineTo(130, 336);
+      p.quadraticCurveTo(96, 336, 96, 300);
+      p.closePath();
+      const lines = new Path2D();
+      lines.moveTo(132, 262); lines.quadraticCurveTo(168, 292, 214, 296);
+      return { body: p, lines, stroke: 5 };
+    }
+
+    case 'welly': {
+      // Tall, straight-sided and flat-soled: a boot with no shape to it.
+      const p = new Path2D();
+      p.moveTo(146, 120); p.lineTo(232, 120);
+      p.lineTo(238, 300);
+      p.quadraticCurveTo(240, 322, 286, 328);
+      p.quadraticCurveTo(322, 334, 320, 362);
+      p.quadraticCurveTo(318, 384, 276, 384);
+      p.lineTo(146, 384);
+      p.quadraticCurveTo(138, 300, 140, 220);
+      p.closePath();
+      const lines = new Path2D();
+      lines.moveTo(146, 160); lines.lineTo(234, 160);
+      lines.moveTo(146, 360); lines.lineTo(300, 360);
+      return { body: p, lines, stroke: 5 };
+    }
+
+    case 'umbrella': {
+      // Canopy, ribs and a crook handle.
+      const p = new Path2D();
+      p.moveTo(70, 250);
+      p.quadraticCurveTo(80, 120, 200, 120);
+      p.quadraticCurveTo(320, 120, 330, 250);
+      p.quadraticCurveTo(300, 226, 265, 250);
+      p.quadraticCurveTo(232, 224, 200, 250);
+      p.quadraticCurveTo(168, 224, 135, 250);
+      p.quadraticCurveTo(100, 226, 70, 250);
+      p.closePath();
+      p.rect(194, 128, 12, 232);
+      p.moveTo(194, 344);
+      p.quadraticCurveTo(148, 344, 148, 386);
+      p.lineTo(172, 386);
+      p.quadraticCurveTo(172, 366, 206, 366);
+      p.closePath();
+      const lines = new Path2D();
+      lines.moveTo(135, 246); lines.quadraticCurveTo(160, 140, 200, 124);
+      lines.moveTo(265, 246); lines.quadraticCurveTo(240, 140, 200, 124);
+      return { body: p, lines, stroke: 4 };
     }
 
     case 'gloves': {

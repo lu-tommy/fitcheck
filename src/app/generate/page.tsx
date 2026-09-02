@@ -123,7 +123,9 @@ function Generator() {
         // An explicit choice always beats a reading of the sentence.
         formality: formality || intent?.formality,
         style: style || undefined,
-        colorPreference: colorPreference || undefined,
+        // An explicit choice wins; otherwise the day may ask for one, as a
+        // funeral asks for black.
+        colorPreference: colorPreference || intent?.colorPreference || undefined,
         temperature: intent?.temperature ?? weather?.temperature,
         weatherCondition: weather?.condition,
         includeItemIds: includeIds,
@@ -167,7 +169,9 @@ function Generator() {
         occasion: occasion ?? intent?.occasion,
         formality: formality || intent?.formality,
         style: style || undefined,
-        colorPreference: colorPreference || undefined,
+        // An explicit choice wins; otherwise the day may ask for one, as a
+        // funeral asks for black.
+        colorPreference: colorPreference || intent?.colorPreference || undefined,
         temperature: intent?.temperature ?? weather?.temperature,
         weatherCondition: weather?.condition,
         includeItemIds: includeIds,

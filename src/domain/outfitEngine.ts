@@ -19,9 +19,12 @@ import {
   accessoryPosition,
   categoryMeta,
   formalityScore,
+  isWaterproof,
   slotOf,
+  spoiledByRain,
 } from './taxonomy';
 import { currentSeason } from '@/lib/date';
+import { weatherKind } from '@/lib/weather';
 import { formatTemperatureLong, titleCase } from '@/lib/format';
 
 /**
@@ -136,6 +139,24 @@ function layerWouldClash(
  */
 const ACCESSORY_FLOOR = 45;
 
+/**
+ * Whether the sky is going to be a problem.
+ *
+ * The most-asked question a wardrobe app answers is "what do I wear today", and
+ * on a great many days the honest answer starts with "it is going to rain". The
+ * forecast was fetched, stored, shown on the home screen — and the engine read
+ * exactly one field of it, the temperature. A downpour and a clear day at the
+ * same twelve degrees produced the identical outfit, suede boots and all.
+ */
+export function isWet(weather?: WeatherSnapshot | null): boolean {
+  if (!weather) return false;
+  const kind = weatherKind(weather.code);
+  if (kind === 'rain' || kind === 'snow' || kind === 'storm') return true;
+  // A high chance with a clear code is a forecast for later in the day, which
+  // is exactly when somebody wants to have been told.
+  return weather.precipitationChance >= 50;
+}
+
 function scoreItem(item: ClothingItem, context: EngineContext, temperature: number): number {
   const { request } = context;
   let score = 50;
@@ -187,6 +208,7 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
   // Warmth suitability for the individual piece.
   const warmth = categoryMeta(item.category).warmth;
   const slot = slotOf(item.category);
+  const wet = isWet(context.weather);
   if (temperature >= 24 && warmth >= 2) score -= 25;
   // Fleece joggers are not a two-warmth garment and were sailing through.
   if (temperature >= 27 && warmth >= 1) score -= 22;
@@ -200,6 +222,27 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
    * gym. It is the one accessory nobody wears for the look alone.
    */
   if (slot === 'accessory' && warmth >= 2 && temperature >= 15) score -= 40;
+
+  /*
+   * Rain.
+   *
+   * Waterproof pieces are pulled forward hard enough to beat a nicer coat, and
+   * anything a downpour ruins is pushed back the same way — the same pair of
+   * boots is fine in leather and a write-off in suede, which is a fact about
+   * the material and not about the category.
+   */
+  if (wet) {
+    if (slot === 'outerwear' || slot === 'footwear') {
+      if (isWaterproof(item)) score += 45;
+      if (spoiledByRain(item.material)) score -= 55;
+    }
+    // Worth carrying, and only today.
+    if (item.category === 'umbrella') score += 90;
+    // Nobody wants wet feet or bare legs in it.
+    if (item.category === 'sandals') score -= 60;
+  } else if (item.category === 'umbrella') {
+    score -= 200;
+  }
 
   /*
    * Sunglasses are worn for the sun, and the engine had no idea.
@@ -485,6 +528,9 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
    * whatever the rule was protecting them from. Skipping a candidate has to
    * mean trying the next one.
    */
+  /** Declared before takeLayer, which reads it. */
+  const raining = isWet(weather);
+
   const takeLayer = (slot: Slot) => {
     const options = slotAlternativesFor(slot, scored, chosen, used);
 
@@ -503,7 +549,13 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
        * shortfall, or it is not the answer to it.
        */
       const gap = needed - warmthOf(chosen);
-      if (temperature >= 17 && categoryMeta(candidate.category).warmth > gap) continue;
+      if (
+        !raining &&
+        temperature >= 17 &&
+        categoryMeta(candidate.category).warmth > gap
+      ) {
+        continue;
+      }
 
       take(candidate);
       return;
@@ -513,7 +565,16 @@ export function buildOutfitLocally(context: EngineContext): GeneratedOutfit {
   if (warmthOf(chosen) < needed && !chosen.some((item) => slotOf(item.category) === 'midlayer')) {
     takeLayer('midlayer');
   }
-  if (warmthOf(chosen) < needed && !chosen.some((item) => slotOf(item.category) === 'outerwear')) {
+  /*
+   * Rain is its own reason for a coat. The layering was driven entirely by
+   * warmth, so at fifteen degrees and ninety per cent rain the engine saw an
+   * outfit that was warm enough and stopped — sending somebody out into a
+   * downpour in a t-shirt, having read the forecast to decide it.
+   */
+  if (
+    (warmthOf(chosen) < needed || raining) &&
+    !chosen.some((item) => slotOf(item.category) === 'outerwear')
+  ) {
     takeLayer('outerwear');
   }
   if (temperature <= 4 && !chosen.some((item) => slotOf(item.category) === 'headwear')) {

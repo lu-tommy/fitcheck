@@ -25,6 +25,8 @@ export interface Intent {
   avoid: Category[];
   /** A nudge in degrees when the words imply weather. */
   temperature?: number;
+  /** Where the day itself asks for a colour. A funeral asks for black. */
+  colorPreference?: string;
   /** Shown back to the wearer, so a wrong reading is visible and correctable. */
   summary: string;
 }
@@ -33,6 +35,26 @@ interface Rule {
   occasion: string;
   /** Whole words, matched case-insensitively. */
   keywords: string[];
+  /**
+   * Phrases that veto a match however well a keyword fits.
+   *
+   * "Run" is a keyword for the gym and is also half of "running errands" and
+   * "the school run" — both of which matched, so somebody popping to the shops
+   * was dressed for a workout and had jeans, shirts and boots actively ruled
+   * out. A whole-word match is not enough when the word does two jobs.
+   */
+  unless?: string[];
+  /** Where the day itself asks for a colour, as a funeral does. */
+  colorPreference?: string;
+  /**
+   * What to call it when a particular word was used.
+   *
+   * One rule can serve several days that dress identically, and the label still
+   * has to be the one the person typed: somebody who wrote "the gym" was told
+   * the app had built them "a run look", which is a small thing that reads as
+   * not having been listened to.
+   */
+  names?: Record<string, string>;
   formality: Formality;
   styles: Style[];
   prefer: Category[];
@@ -54,6 +76,12 @@ const RULES: Rule[] = [
     occasion: 'a run',
     keywords: ['run', 'running', 'jog', 'jogging', 'gym', 'workout', 'working out', 'exercise',
       'training', 'yoga', 'pilates', 'cycling', 'spin', 'sport', 'sports', 'football', 'tennis'],
+    unless: ['errand', 'errands', 'school run', 'run out', 'run around', 'dry run', 'run to the'],
+    names: {
+      gym: 'the gym', workout: 'the gym', 'working out': 'the gym', training: 'training',
+      exercise: 'the gym', yoga: 'yoga', pilates: 'pilates', cycling: 'a ride',
+      spin: 'spin', football: 'football', tennis: 'tennis',
+    },
     formality: 'very-casual',
     styles: ['athletic'],
     prefer: ATHLETIC,
@@ -71,8 +99,78 @@ const RULES: Rule[] = [
     summary: 'something hard-wearing',
   },
   {
+    /*
+     * Its own rule, and it has to come first. "Funeral" was a keyword on the
+     * WEDDING rule, so the app read the two as the same day and told somebody
+     * it had built them "a wedding look" — then dressed them for a celebration.
+     * They are both formal and they are not remotely the same occasion.
+     */
+    occasion: 'a funeral',
+    keywords: ['funeral', 'memorial', 'wake', 'burial'],
+    formality: 'formal',
+    styles: ['formal', 'minimalist'],
+    colorPreference: 'black',
+    prefer: ['blazer', 'suit', 'dress-pants', 'shirt', 'blouse', 'dress', 'coat', 'dress-shoes', 'flats'],
+    avoid: ['shorts', 'tank', 'joggers', 'leggings', 'hoodie', 'sandals', 'sneakers', 'cap', 'swimwear'],
+    summary: 'dark, plain and respectful',
+  },
+  {
+    occasion: 'a graduation',
+    keywords: ['graduation', 'graduate', 'graduating', 'prize giving', 'award'],
+    formality: 'business-casual',
+    styles: ['formal', 'business-casual'],
+    prefer: SMART,
+    avoid: ['shorts', 'joggers', 'leggings', 'hoodie', 'tank', 'swimwear'],
+    summary: 'smart, and comfortable enough to sit through it',
+  },
+  {
+    occasion: 'the theatre',
+    keywords: ['theatre', 'theater', 'opera', 'ballet', 'symphony', 'orchestra'],
+    formality: 'business-casual',
+    styles: ['formal', 'minimalist'],
+    prefer: SMART,
+    avoid: ['shorts', 'joggers', 'leggings', 'tank', 'sandals', 'swimwear'],
+    summary: 'smart, and warm enough for a cold auditorium',
+  },
+  {
+    occasion: 'a baby shower',
+    keywords: ['baby shower', 'christening party', 'naming'],
+    formality: 'smart-casual',
+    styles: ['casual', 'preppy'],
+    prefer: ['blouse', 'shirt', 'dress', 'skirt', 'chinos', 'flats', 'loafers'],
+    avoid: ['joggers', 'leggings', 'hoodie', 'swimwear', 'suit'],
+    summary: 'smart but soft — nothing anybody has to be careful around',
+  },
+  {
+    occasion: 'a festival',
+    keywords: ['festival', 'glastonbury', 'camping trip', 'coachella'],
+    formality: 'very-casual',
+    styles: ['streetwear', 'outdoor', 'casual'],
+    prefer: ['tshirt', 'tank', 'shorts', 'jeans', 'jacket', 'raincoat', 'boots', 'rain-boots', 'sunglasses'],
+    avoid: ['dress-shoes', 'loafers', 'flats', 'blazer', 'suit', 'tie', 'blouse'],
+    summary: 'layers, and something you do not mind ruining',
+  },
+  {
+    occasion: 'a barbecue',
+    keywords: ['barbecue', 'bbq', 'picnic', 'garden party', 'cookout'],
+    formality: 'casual',
+    styles: ['casual', 'preppy'],
+    prefer: ['tshirt', 'polo', 'shirt', 'shorts', 'chinos', 'jeans', 'sneakers', 'sandals'],
+    avoid: ['suit', 'blazer', 'tie', 'dress-shoes', 'dress-pants'],
+    summary: 'easy, and fine to sit on grass in',
+  },
+  {
+    occasion: 'a night out',
+    keywords: ['pub', 'bar', 'pint', 'out out', 'nightclub', 'pubs'],
+    formality: 'smart-casual',
+    styles: ['casual', 'streetwear'],
+    prefer: ['shirt', 'blouse', 'jeans', 'skirt', 'dress', 'boots', 'loafers'],
+    avoid: ['joggers', 'leggings', 'hoodie', 'sandals', 'swimwear', 'cap'],
+    summary: 'sharp enough for the door, comfortable enough to stand up all night',
+  },
+  {
     occasion: 'a wedding',
-    keywords: ['wedding', 'black tie', 'gala', 'ceremony', 'funeral', 'christening'],
+    keywords: ['wedding', 'black tie', 'gala', 'ceremony', 'christening'],
     formality: 'formal',
     styles: ['formal'],
     prefer: ['suit', 'blazer', 'dress', 'dress-pants', 'dress-shoes', 'tie', 'shirt', 'blouse'],
@@ -210,10 +308,18 @@ export function readIntent(input: string): Intent | null {
   const text = ` ${input.toLowerCase().trim()} `;
   if (text.trim().length < 2) return null;
 
-  const rule = RULES.find((candidate) =>
-    candidate.keywords.some((keyword) => mentions(text, keyword)),
+  const rule = RULES.find(
+    (candidate) =>
+      candidate.keywords.some((keyword) => mentions(text, keyword)) &&
+      !candidate.unless?.some((veto) => text.includes(veto)),
   );
   if (!rule) return null;
+
+  // The longest matching keyword, so "working out" beats "work" for a label.
+  const matched = rule.keywords
+    .filter((keyword) => mentions(text, keyword))
+    .sort((a, b) => b.length - a.length)[0];
+  const occasion = (matched && rule.names?.[matched]) ?? rule.occasion;
 
   let formality = rule.formality;
   const modifiers: string[] = [];
@@ -231,13 +337,14 @@ export function readIntent(input: string): Intent | null {
   if (weather) modifiers.push(`for ${weather.note} weather`);
 
   return {
-    occasion: rule.occasion,
+    occasion,
     formality,
     styles: rule.styles,
     prefer: rule.prefer,
     avoid: rule.avoid,
     temperature: weather?.temperature,
-    summary: [`Reading this as ${rule.occasion}`, rule.summary, ...modifiers].join(' — '),
+    colorPreference: rule.colorPreference,
+    summary: [`Reading this as ${occasion}`, rule.summary, ...modifiers].join(' — '),
   };
 }
 

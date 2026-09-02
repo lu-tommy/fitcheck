@@ -20,6 +20,8 @@ export interface CategoryMeta {
   warmth: number;
   /** Typical formality, used when the user skips the field. */
   formality: Formality;
+  /** True where the category is waterproof by definition. See ClothingItem. */
+  waterproof?: boolean;
 }
 
 export const CATEGORIES: CategoryMeta[] = [
@@ -33,26 +35,31 @@ export const CATEGORIES: CategoryMeta[] = [
   { category: 'blouse', label: 'Blouse', slot: 'top', warmth: 0, formality: 'business-casual' },
   { category: 'tank', label: 'Tank top', slot: 'top', warmth: 0, formality: 'very-casual' },
   { category: 'longsleeve', label: 'Long sleeve', slot: 'top', warmth: 1, formality: 'casual' },
+  { category: 'turtleneck', label: 'Turtleneck', slot: 'top', warmth: 2, formality: 'smart-casual' },
 
   { category: 'sweater', label: 'Sweater', slot: 'midlayer', warmth: 2, formality: 'smart-casual' },
   { category: 'hoodie', label: 'Hoodie', slot: 'midlayer', warmth: 2, formality: 'very-casual' },
   { category: 'cardigan', label: 'Cardigan', slot: 'midlayer', warmth: 2, formality: 'smart-casual' },
   { category: 'vest', label: 'Vest', slot: 'midlayer', warmth: 1, formality: 'smart-casual' },
+  { category: 'overshirt', label: 'Overshirt', slot: 'midlayer', warmth: 1, formality: 'casual' },
 
   { category: 'jacket', label: 'Jacket', slot: 'outerwear', warmth: 2, formality: 'casual' },
   { category: 'blazer', label: 'Blazer', slot: 'outerwear', warmth: 1, formality: 'business-casual' },
   { category: 'coat', label: 'Coat', slot: 'outerwear', warmth: 3, formality: 'business-casual' },
   { category: 'parka', label: 'Parka', slot: 'outerwear', warmth: 3, formality: 'casual' },
+  { category: 'raincoat', label: 'Raincoat', slot: 'outerwear', warmth: 1, formality: 'casual', waterproof: true },
 
   { category: 'dress', label: 'Dress', slot: 'fullbody', warmth: 0, formality: 'formal' },
   { category: 'jumpsuit', label: 'Jumpsuit', slot: 'fullbody', warmth: 1, formality: 'smart-casual' },
   { category: 'suit', label: 'Suit', slot: 'fullbody', warmth: 1, formality: 'formal' },
+  { category: 'swimwear', label: 'Swimwear', slot: 'fullbody', warmth: 0, formality: 'very-casual' },
 
   { category: 'jeans', label: 'Jeans', slot: 'bottom', warmth: 1, formality: 'casual' },
   { category: 'chinos', label: 'Chinos', slot: 'bottom', warmth: 1, formality: 'smart-casual' },
   { category: 'dress-pants', label: 'Dress pants', slot: 'bottom', warmth: 1, formality: 'formal' },
   { category: 'shorts', label: 'Shorts', slot: 'bottom', warmth: 0, formality: 'very-casual' },
   { category: 'joggers', label: 'Joggers', slot: 'bottom', warmth: 1, formality: 'very-casual' },
+  { category: 'leggings', label: 'Leggings', slot: 'bottom', warmth: 1, formality: 'very-casual' },
   { category: 'skirt', label: 'Skirt', slot: 'bottom', warmth: 0, formality: 'smart-casual' },
 
   { category: 'sneakers', label: 'Sneakers', slot: 'footwear', warmth: 0, formality: 'casual' },
@@ -60,6 +67,8 @@ export const CATEGORIES: CategoryMeta[] = [
   { category: 'dress-shoes', label: 'Dress shoes', slot: 'footwear', warmth: 0, formality: 'formal' },
   { category: 'loafers', label: 'Loafers', slot: 'footwear', warmth: 0, formality: 'business-casual' },
   { category: 'sandals', label: 'Sandals', slot: 'footwear', warmth: 0, formality: 'very-casual' },
+  { category: 'flats', label: 'Flats', slot: 'footwear', warmth: 0, formality: 'business-casual' },
+  { category: 'rain-boots', label: 'Rain boots', slot: 'footwear', warmth: 1, formality: 'very-casual', waterproof: true },
 
   { category: 'watch', label: 'Watch', slot: 'accessory', warmth: 0, formality: 'smart-casual' },
   { category: 'belt', label: 'Belt', slot: 'accessory', warmth: 0, formality: 'smart-casual' },
@@ -79,6 +88,7 @@ export const CATEGORIES: CategoryMeta[] = [
   { category: 'tights', label: 'Tights', slot: 'accessory', warmth: 1, formality: 'smart-casual' },
   { category: 'bag', label: 'Bag', slot: 'accessory', warmth: 0, formality: 'casual' },
   { category: 'gloves', label: 'Gloves', slot: 'accessory', warmth: 2, formality: 'casual' },
+  { category: 'umbrella', label: 'Umbrella', slot: 'accessory', warmth: 0, formality: 'casual', waterproof: true },
   { category: 'other', label: 'Other', slot: 'accessory', warmth: 0, formality: 'casual' },
 ];
 
@@ -162,6 +172,7 @@ const ACCESSORY_POSITION: Partial<Record<Category, AccessoryPosition>> = {
   socks: 'legs',
   tights: 'legs',
   bag: 'carried',
+  umbrella: 'carried',
   gloves: 'hands',
   other: 'other',
 };
@@ -221,6 +232,7 @@ const ACCESSORY_FOCAL_WEIGHT: Partial<Record<Category, number>> = {
   necklace: 1,
   earrings: 1,
   bag: 1,
+  umbrella: 0.4,
   scarf: 1,
   'bow-tie': 0.9,
   sunglasses: 0.8,
@@ -517,4 +529,29 @@ const METAL_CATEGORIES: Category[] = [
 
 export function hasMetal(category: Category): boolean {
   return METAL_CATEGORIES.includes(category);
+}
+
+/**
+ * Whether a piece keeps the rain off.
+ *
+ * The item's own answer wins where somebody has given one — a waxed jacket is
+ * waterproof and its category cannot know that — and otherwise the category
+ * decides. Nobody should have to tag a raincoat.
+ */
+export function isWaterproof(item: { category: Category; waterproof?: boolean }): boolean {
+  return item.waterproof ?? categoryMeta(item.category).waterproof ?? false;
+}
+
+/**
+ * Materials that a downpour ruins, or that stop being clothes when wet.
+ *
+ * Read off the material rather than the category, because the same pair of
+ * boots is fine in leather and a write-off in suede.
+ */
+const SPOILED_BY_RAIN = ['suede', 'silk', 'linen', 'cashmere'];
+
+export function spoiledByRain(material?: string): boolean {
+  if (!material) return false;
+  const name = material.trim().toLowerCase();
+  return SPOILED_BY_RAIN.some((wet) => name.includes(wet));
 }

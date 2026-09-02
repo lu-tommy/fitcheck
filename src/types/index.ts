@@ -29,26 +29,31 @@ export type Category =
   | 'blouse'
   | 'tank'
   | 'longsleeve'
+  | 'turtleneck'
   // mid layers
   | 'sweater'
   | 'hoodie'
   | 'cardigan'
   | 'vest'
+  | 'overshirt'
   // outerwear
   | 'jacket'
   | 'coat'
   | 'blazer'
   | 'parka'
+  | 'raincoat'
   // full body
   | 'dress'
   | 'jumpsuit'
   | 'suit'
+  | 'swimwear'
   // bottoms
   | 'jeans'
   | 'chinos'
   | 'dress-pants'
   | 'shorts'
   | 'joggers'
+  | 'leggings'
   | 'skirt'
   // footwear
   | 'sneakers'
@@ -56,6 +61,8 @@ export type Category =
   | 'dress-shoes'
   | 'loafers'
   | 'sandals'
+  | 'flats'
+  | 'rain-boots'
   // accessories
   | 'watch'
   | 'belt'
@@ -75,6 +82,7 @@ export type Category =
   | 'tights'
   | 'bag'
   | 'gloves'
+  | 'umbrella'
   | 'other';
 
 export type Pattern =
@@ -227,6 +235,15 @@ export interface ClothingItem {
   rise?: Rise;
   /** Jewellery only. Undefined means nobody has said, not that it has none. */
   metal?: Metal;
+  /**
+   * Whether it keeps the rain off.
+   *
+   * A property rather than a list of coat names: a trench, a raincoat, a shell
+   * and a pair of rubber boots are all waterproof and nothing about their
+   * categories says so. Undefined falls back to what the category implies, so
+   * nobody has to tag a raincoat as waterproof.
+   */
+  waterproof?: boolean;
   material?: string;
   brand?: string;
   formality: Formality;

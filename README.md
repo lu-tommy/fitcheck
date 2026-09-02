@@ -755,6 +755,45 @@ outfits and wincing.
 **A test was protecting the worst of them.** `prefers the less-worn of two
 equivalent pieces` asserted the inversion as if it were the feature.
 
+## Finding the holes, rather than checking the parts
+
+Reading ten outfits catches bad answers and is blind to missing questions — a
+category nothing can pick, a sentence nobody parsed, a kind of weather the
+engine has never heard of. Those do not fail a test; they simply never come up.
+
+`coverageAudit.test.ts` walks the whole surface instead, and is written to fail
+where there is a hole. What it found:
+
+- **The engine had never heard of rain.** The forecast is fetched, stored and
+  shown on the home screen, and the outfit builder read exactly one field of it:
+  the temperature. A downpour and a clear day at the same twelve degrees
+  produced the identical outfit, suede boots and all. Waterproofing is now a
+  *property* rather than a list of coat names — a trench, a shell and a pair of
+  rubber boots are all waterproof and nothing about their categories says so —
+  and rain is a reason for a coat in its own right, not only cold.
+- **A funeral was literally a wedding.** "Funeral" was a keyword on the wedding
+  rule, so the app read the two as the same day and announced it had built
+  "a wedding look". Both are formal; they are not remotely the same occasion.
+  A funeral has its own rule now, and asks for black.
+- **"Running errands" and "the school run" dressed you for the gym.** `run` is
+  a keyword for the athletic rule and also half of both phrases, so somebody
+  popping to the shops had jeans, shirts and boots actively ruled out. A
+  whole-word match is not enough when the word does two jobs; rules can veto.
+- **Seven kinds of day could not be read at all** — a graduation, a festival,
+  the pub, a barbecue, the theatre, a baby shower, going out out.
+- **Leggings did not exist.** They fell back to *Other*, which is an accessory,
+  so a garment a great many people wear most days could never be a bottom.
+  Seven more were missing with them: turtleneck, overshirt, raincoat, swimwear,
+  flats, rain boots and an umbrella — each chosen because it lets the engine
+  express something it could not before, rather than to lengthen the list.
+- **The demo drew 22 of 55 silhouettes.** It is the only place all of them are
+  ever rendered, so thirty-three drawings had never been looked at — and a
+  capsule with no dress, no coat and no shoes but trainers is not one anybody
+  recognises. It is one of everything again, as it says it is.
+- **It called the day back to you by the wrong name.** Type "the gym" and it
+  announced "a run look". One rule can serve several days that dress alike; the
+  label still has to be the word that was used.
+
 ## Testing
 
 `npm test` covers the domain layer — the outfit engine's slot rules and
