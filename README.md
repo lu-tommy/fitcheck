@@ -274,6 +274,23 @@ piece, what is under it and what the weather is doing, which is enough for
 "Cream over indigo", "Navy under the olive" or "Charcoal, wrapped up". Still
 deterministic: same closet, same day, same name.
 
+### Without a pointer
+
+The cropper was built entirely around a finger and was, as a result, unusable
+without one: the boxes were plain elements, so a desktop user had a mouse-only
+tool and a screen-reader user had none at all.
+
+Every box is now focusable and announces where it is in percentages — the only
+numbers that mean anything read aloud without the photo in front of you. Arrows
+nudge by one screen pixel, shift by ten, alt resizes, delete removes, escape
+lets go, and a button places a box in the middle of the view so the keyboard
+path does not start at boxes somebody else drew.
+
+Which makes the keys the most precise instrument on the screen. The whole
+argument for pinch-zoom is that a fingertip covers a hundred source pixels; an
+arrow key covers exactly one, at any magnification, with no loupe and no steady
+hand.
+
 ### Turning the photo
 
 The crop is exactly the box that was drawn, and it is an *axis-aligned* box —

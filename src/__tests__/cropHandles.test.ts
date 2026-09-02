@@ -5,7 +5,9 @@ import {
   CROP_ASPECT,
   MIN_BOX,
   cropFrame,
+  describeBox,
   isDrawnBox,
+  nudgeBox,
   rotateBox,
   rotatedExtent,
 } from '@/lib/crop';
@@ -351,5 +353,82 @@ describe('rotateBox', () => {
     expect(box.y).toBeCloseTo(0.2, 3);
     expect(box.width).toBeCloseTo(0.3, 3);
     expect(box.height).toBeCloseTo(0.4, 3);
+  });
+});
+
+/**
+ * The cropper was built entirely around a finger and was, as a result,
+ * unusable without one. It is also — once it has keys at all — the most precise
+ * instrument on the screen: the whole argument for pinch-zoom is that a
+ * fingertip covers a hundred source pixels, and an arrow key covers exactly
+ * one at any magnification.
+ */
+describe('nudgeBox', () => {
+  const box = { id: 'b', x: 0.2, y: 0.2, width: 0.4, height: 0.4 };
+  const fitted = { w: 400, h: 500 };
+
+  it('moves by whole screen pixels, whichever way the photo is scaled', () => {
+    const moved = nudgeBox(box, 4, 0, 'move', fitted.w, fitted.h);
+    expect(moved.x).toBeCloseTo(0.21, 4);
+    expect(moved.width).toBeCloseTo(0.4, 4);
+  });
+
+  /*
+   * A nudge has to mean the same thing to the eye at any zoom. Four screen
+   * pixels is four screen pixels whether the photo is fitted or magnified.
+   */
+  it('means the same to the eye when the photo is magnified', () => {
+    const fittedMove = nudgeBox(box, 4, 0, 'move', fitted.w, fitted.h);
+    const zoomedMove = nudgeBox(box, 4, 0, 'move', fitted.w * 8, fitted.h * 8);
+    expect(zoomedMove.x - box.x).toBeCloseTo((fittedMove.x - box.x) / 8, 5);
+  });
+
+  it('resizes from the far edges, so the corner it was put at stays put', () => {
+    const bigger = nudgeBox(box, 8, 10, 'resize', fitted.w, fitted.h);
+    expect(bigger.x).toBeCloseTo(0.2, 4);
+    expect(bigger.y).toBeCloseTo(0.2, 4);
+    expect(bigger.width).toBeCloseTo(0.42, 4);
+    expect(bigger.height).toBeCloseTo(0.42, 4);
+  });
+
+  it('will not push a box off the photograph', () => {
+    const shoved = nudgeBox(box, 100000, 100000, 'move', fitted.w, fitted.h);
+    expect(shoved.x + shoved.width).toBeCloseTo(1, 4);
+    expect(shoved.y + shoved.height).toBeCloseTo(1, 4);
+
+    const pulled = nudgeBox(box, -100000, -100000, 'move', fitted.w, fitted.h);
+    expect(pulled.x).toBe(0);
+    expect(pulled.y).toBe(0);
+  });
+
+  it('will not shrink a box until it turns inside out', () => {
+    const tiny = nudgeBox(box, -100000, -100000, 'resize', fitted.w, fitted.h);
+    expect(tiny.width).toBe(MIN_BOX);
+    expect(tiny.height).toBe(MIN_BOX);
+  });
+
+  it('will not grow a box past the edge it is already against', () => {
+    const corner = { id: 'b', x: 0.8, y: 0.8, width: 0.2, height: 0.2 };
+    const grown = nudgeBox(corner, 100000, 100000, 'resize', fitted.w, fitted.h);
+    expect(corner.x + grown.width).toBeCloseTo(1, 4);
+  });
+
+  it('does nothing at all before the photo has been measured', () => {
+    expect(nudgeBox(box, 4, 4, 'move', 0, 0)).toEqual(box);
+  });
+});
+
+describe('describeBox', () => {
+  it('says where a box is in numbers that mean something out loud', () => {
+    const said = describeBox({ id: 'b', x: 0.25, y: 0.1, width: 0.5, height: 0.4 }, 2);
+    expect(said).toContain('Piece 2');
+    expect(said).toContain('50 by 40 per cent');
+    expect(said).toContain('25 per cent from the left');
+    expect(said).toContain('10 per cent from the top');
+  });
+
+  it('includes what the parser called it, when it called it anything', () => {
+    const said = describeBox({ id: 'b', x: 0, y: 0, width: 0.5, height: 0.5 }, 1, 'Jeans');
+    expect(said).toContain('Jeans');
   });
 });

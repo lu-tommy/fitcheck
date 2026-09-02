@@ -408,3 +408,72 @@ export async function rotateImage(source: Blob, degrees: number): Promise<Blob> 
   if (!blob) throw new Error('Could not turn the photo');
   return blob;
 }
+
+/* -------------------------------------------------------------- keyboard -- */
+
+export type Nudge = 'move' | 'resize';
+
+/**
+ * Move or resize a box by a whole number of screen pixels.
+ *
+ * The cropper was built entirely around a finger and was, as a result,
+ * unusable without one: the boxes are plain elements with no focus and no
+ * keys, so a desktop user had a mouse-only tool and a screen-reader user had
+ * none at all.
+ *
+ * It is also, incidentally, the most precise instrument on the screen. The
+ * whole argument for pinch-zoom is that a fingertip covers a hundred source
+ * pixels; an arrow key covers exactly one, at any zoom, without a magnifier or
+ * a steady hand.
+ *
+ * Steps arrive in screen pixels and are converted here, so a nudge means the
+ * same thing to the eye whether the photo is fitted or magnified ten times —
+ * which is the only definition that makes sense for a key that is meant to
+ * move something "a little".
+ */
+export function nudgeBox(
+  box: CropBox,
+  dxPixels: number,
+  dyPixels: number,
+  mode: Nudge,
+  displayWidth: number,
+  displayHeight: number,
+): CropBox {
+  if (!displayWidth || !displayHeight) return box;
+  const safe = normaliseBox(box);
+  const dx = dxPixels / displayWidth;
+  const dy = dyPixels / displayHeight;
+
+  if (mode === 'move') {
+    return {
+      ...safe,
+      x: clamp(safe.x + dx, 0, 1 - safe.width),
+      y: clamp(safe.y + dy, 0, 1 - safe.height),
+    };
+  }
+
+  // Resizing pulls the far edges, so the top-left stays where it was put —
+  // which is what somebody watching the box expects a width key to do.
+  return {
+    ...safe,
+    width: clamp(safe.width + dx, MIN_BOX, 1 - safe.x),
+    height: clamp(safe.height + dy, MIN_BOX, 1 - safe.y),
+  };
+}
+
+/**
+ * What to call a box out loud.
+ *
+ * Percentages rather than pixels: the numbers a screen reader says have to mean
+ * something without the photo's dimensions in front of you, and "a third of the
+ * way across" is a position anybody can picture.
+ */
+export function describeBox(box: CropBox, index: number, label?: string): string {
+  const safe = normaliseBox(box);
+  const pct = (value: number) => Math.round(value * 100);
+  const named = label ? `${label}, ` : '';
+  return (
+    `Piece ${index}: ${named}${pct(safe.width)} by ${pct(safe.height)} per cent of the photo, ` +
+    `${pct(safe.x)} per cent from the left and ${pct(safe.y)} per cent from the top`
+  );
+}

@@ -7,6 +7,7 @@ import {
   Minus,
   Plus,
   RotateCw,
+  SquareDashed,
   Sparkles,
   Trash2,
   Undo2,
@@ -18,8 +19,10 @@ import { Button } from '@/components/ui/Button';
 import {
   MIN_BOX,
   MIN_DRAG_PX,
+  describeBox,
   isDrawnBox,
   normaliseBox,
+  nudgeBox,
   rotateBox,
   rotateImage,
   type CropBox,
@@ -84,6 +87,14 @@ export type Mode = 'draw' | 'pan';
 
 /** Past this the photo is being examined rather than framed, so a drag pans. */
 const PAN_FROM_ZOOM = 1.05;
+
+/** Which way each arrow goes, in screen pixels. */
+const ARROWS: Record<string, [number, number]> = {
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+};
 
 interface Pinch {
   distance: number;
@@ -199,6 +210,79 @@ export function MultiCrop({
   const [asking, setAsking] = useState(false);
   const [parsing, setParsing] = useState<ParseProgress | null>(null);
   const [parseNote, setParseNote] = useState<string | null>(null);
+
+  /**
+   * Everything a finger can do, from the keys.
+   *
+   * The tool was built entirely around a finger and was, as a result, unusable
+   * without one — the boxes are plain elements, so a desktop user had a
+   * mouse-only tool and a screen-reader user had none at all. Arrows are also,
+   * incidentally, the most precise instrument here: the whole argument for
+   * pinch-zoom is that a fingertip covers a hundred source pixels, and an arrow
+   * key covers exactly one.
+   */
+  function onBoxKeyDown(event: React.KeyboardEvent, id: string) {
+    if (event.key === 'Escape') {
+      setActive(null);
+      (event.currentTarget as HTMLElement).blur();
+      return;
+    }
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      event.preventDefault();
+      setBoxes((current) => current.filter((box) => box.id !== id));
+      setActive(null);
+      return;
+    }
+
+    const step = ARROWS[event.key];
+    if (!step) return;
+    event.preventDefault();
+
+    // Alt resizes, shift goes ten at a time — so a box can be walked across a
+    // photo or settled onto a hem without changing tools.
+    const distance = event.shiftKey ? 10 : 1;
+    const mode = event.altKey ? 'resize' : 'move';
+    setBoxes((current) =>
+      current.map((box) =>
+        box.id === id
+          ? {
+              ...box,
+              ...nudgeBox(
+                box,
+                step[0] * distance,
+                step[1] * distance,
+                mode,
+                displayWidth,
+                displayHeight,
+              ),
+            }
+          : box,
+      ),
+    );
+  }
+
+  /** A box placed without a pointer, in the middle of whatever is on screen. */
+  function addBoxByKeyboard() {
+    if (!displayWidth) return;
+    const id = createId('box');
+    const left = (-originX + viewport.width / 2 - displayWidth * 0.15) / displayWidth;
+    const top = (-originY + viewport.height / 2 - displayHeight * 0.15) / displayHeight;
+    setBoxes((current) => [
+      ...current,
+      {
+        id,
+        x: Math.max(0, Math.min(0.7, left)),
+        y: Math.max(0, Math.min(0.7, top)),
+        width: 0.3,
+        height: 0.3,
+      },
+    ]);
+    setActive(id);
+    // Focus lands on the new box, so the arrows that follow act on it.
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-box-id="${id}"]`)?.focus();
+    });
+  }
 
   /**
    * Turn the photo, and carry the boxes with it.
@@ -563,6 +647,18 @@ export function MultiCrop({
               <Undo2 size={17} />
             </button>
           ) : null}
+          {/*
+            * A box has to be creatable without a pointer, or the keyboard path
+            * stops at adjusting boxes somebody else drew.
+            */}
+          <button
+            type="button"
+            onClick={addBoxByKeyboard}
+            aria-label="Add a box in the middle of the view"
+            className="pressable grid size-9 place-items-center rounded-full bg-[var(--surface-alt)]"
+          >
+            <SquareDashed size={17} />
+          </button>
           <button
             type="button"
             onClick={onCancel}
@@ -646,10 +742,17 @@ export function MultiCrop({
               <div
                 key={box.id}
                 data-piece={index + 1}
+                data-box-id={box.id}
+                tabIndex={0}
+                role="group"
+                aria-label={describeBox(shapeBox, index + 1, box.suggestion?.label)}
+                onFocus={() => setActive(box.id)}
+                onKeyDown={(event) => onBoxKeyDown(event, box.id)}
                 // The one under the finger, not "is anything selected" — which
                 // lit every box at once and disagreed with its own handles.
                 className={cn(
-                  'absolute border-2',
+                  'absolute border-2 focus:outline-none',
+                  'focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2',
                   isActive ? 'border-[var(--brand)]' : 'border-white/90',
                 )}
                 style={rect}
@@ -964,6 +1067,7 @@ export function MultiCrop({
           <div className="mb-2.5 flex items-center justify-center gap-3 text-[0.8125rem]">
             <span className="text-[var(--text-muted)]">
               Piece {boxes.findIndex((box) => box.id === selected.id) + 1} selected
+              <span className="hidden sm:inline"> · arrows nudge, alt resizes</span>
             </span>
             <button
               type="button"
