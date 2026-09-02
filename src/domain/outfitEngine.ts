@@ -11,7 +11,7 @@ import type {
   WeatherSnapshot,
 } from '@/types';
 
-import { analyzeHarmony, hexForColorName } from './color';
+import { analyzeHarmony, hexForColorName, hexToHsl, hueDistance, isNeutral } from './color';
 import { AFFINITY_WEIGHT } from './taste';
 import {
   ACCESSORY_FOCAL_BUDGET,
@@ -236,6 +236,13 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
       if (isWaterproof(item)) score += 45;
       if (spoiledByRain(item.material)) score -= 55;
     }
+    /*
+     * And the wrong coat is marked down as well as the right one marked up.
+     * A bonus alone only wins where a waterproof exists; the penalty is what
+     * says a wool blazer is the wrong answer to heavy rain. It falls on every
+     * coat equally, so a wardrobe with nothing waterproof in it still gets one.
+     */
+    if (slot === 'outerwear' && !isWaterproof(item)) score -= 25;
     // Worth carrying, and only today.
     if (item.category === 'umbrella') score += 90;
     // Nobody wants wet feet or bare legs in it.
@@ -268,7 +275,8 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
   const colorText = [item.primaryColor, ...item.secondaryColors].join(' ').toLowerCase();
   if (request.colorPreference) {
     const wanted = request.colorPreference.toLowerCase();
-    if (colorText.includes(wanted)) score += 18;
+    // Named exactly, or near enough to answer the same request.
+    score += colorText.includes(wanted) ? 20 : colourAffinity(wanted, item);
   }
   if (context.avoidColors?.some((color) => colorText.includes(color.toLowerCase()))) score -= 30;
 
@@ -306,7 +314,17 @@ function scoreItem(item: ClothingItem, context: EngineContext, temperature: numb
   // resting piece still beats leaving the slot empty.
   if (context.restingItemIds?.includes(item.id)) score -= 150;
 
-  if (context.preferCategories?.includes(item.category)) score += 60;
+  /*
+   * What the occasion asks for is a strong steer and not a fact.
+   *
+   * This was sixty, which is more than the seasonality penalty, more than the
+   * waterproof bonus, and more than the two combined can answer — so "going to
+   * work" put a wool blazer on somebody in a downpour, past a raincoat, because
+   * the work rule lists a blazer among the things that suit an office. The
+   * occasion says what KIND of garment suits the day. The weather says whether
+   * that garment is wearable today, and it has to be able to say so.
+   */
+  if (context.preferCategories?.includes(item.category)) score += 35;
   if (context.avoidCategories?.includes(item.category)) score -= 400;
 
   if (request.includeItemIds.includes(item.id)) score += 500;
@@ -348,6 +366,39 @@ function recencyPenalty(item: ClothingItem, today?: string): number {
   if (days <= 3) return 18;
   if (days <= 7) return 6;
   return 0;
+}
+
+/**
+ * How well a garment answers a request for a colour it is not literally called.
+ *
+ * The match was a substring of the colour's NAME, which is the narrowest
+ * possible reading: a funeral asks for black, and charcoal, navy and a dark
+ * grey coat all contain none of those six letters. So the app agreed the day
+ * wanted black and then went looking for the word.
+ *
+ * Asking for black is asking for DARK, and asking for blue should find navy and
+ * denim. Comparing the colours themselves is both more useful and less work
+ * than a table of synonyms that would need a new row every time somebody names
+ * a shade.
+ */
+function colourAffinity(wanted: string, item: ClothingItem): number {
+  const target = hexToHsl(hexForColorName(wanted));
+  const here = hexToHsl(item.primaryColorHex || hexForColorName(item.primaryColor));
+
+  /*
+   * Dark. Charcoal and navy answer a request for black; oatmeal does not, and
+   * neither does burgundy — which is dark and is emphatically a colour, and
+   * which lightness alone waved through to a funeral.
+   */
+  const hex = item.primaryColorHex || hexForColorName(item.primaryColor);
+  // The miss costs more than the hit pays. A day that asks for black is asking
+  // for it — an oatmeal jumper over a black dress at a funeral was outscoring a
+  // navy cardigan on a favourite flag and a style tag.
+  if (target.l < 20) return here.l < 32 && isNeutral(hex) ? 14 : -20;
+  // A neutral: match on how light it is, since there is no hue to compare.
+  if (target.s < 15) return here.s < 22 && Math.abs(here.l - target.l) < 25 ? 10 : 0;
+  // A colour: near in hue, and actually coloured rather than a pale wash of it.
+  return hueDistance(target.h, here.h) < 30 && here.s > 15 ? 10 : 0;
 }
 
 function bestBySlot(candidates: ScoredItem[], slot: Slot): ScoredItem | undefined {

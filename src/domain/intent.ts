@@ -251,7 +251,10 @@ const RULES: Rule[] = [
   },
   {
     occasion: 'a day at home',
-    keywords: ['home', 'indoors', 'lounging', 'relaxing', 'chilling', 'sofa', 'errands', 'nothing'],
+    keywords: ['home', 'indoors', 'lounging', 'relaxing', 'chilling', 'sofa', 'errands', 'errand', 'nothing'],
+    // Errands dress like a day at home and are not one, and being told you have
+    // "a day at home look" while heading to the shops reads as not listening.
+    names: { errands: 'errands', errand: 'errands' },
     formality: 'very-casual',
     styles: ['casual'],
     prefer: ['tshirt', 'hoodie', 'joggers', 'shorts', 'sneakers'],

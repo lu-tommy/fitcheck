@@ -24,7 +24,7 @@ import { REAL_WARDROBE } from './fixtures/realWardrobe';
 
 const index = new Map(REAL_WARDROBE.map((item) => [item.id, item]));
 
-function weather(temperature: number): WeatherSnapshot {
+function weather(temperature: number, over: Partial<WeatherSnapshot> = {}): WeatherSnapshot {
   return {
     temperature,
     feelsLike: temperature,
@@ -37,6 +37,7 @@ function weather(temperature: number): WeatherSnapshot {
     units: 'metric',
     locationLabel: 'Home',
     fetchedAt: '2026-06-01T08:00:00.000Z',
+    ...over,
   };
 }
 
@@ -48,20 +49,26 @@ interface Look {
   warnings?: string[];
 }
 
-function dress(scenario: string, prompt: string, temperature: number): Look {
+function dress(
+  scenario: string,
+  prompt: string,
+  temperature: number,
+  sky: Partial<WeatherSnapshot> = {},
+): Look {
   const intent = readIntent(prompt);
   const built = buildOutfitLocally({
     request: {
       prompt,
       occasion: intent?.occasion,
       formality: intent?.formality as Formality | undefined,
+      colorPreference: intent?.colorPreference,
       temperature,
       includeItemIds: [],
       excludeItemIds: [],
       cleanOnly: true,
     },
     closet: REAL_WARDROBE,
-    weather: weather(temperature),
+    weather: weather(temperature, sky),
     season: undefined,
     today: '2026-06-01',
     preferCategories: intent?.prefer,
@@ -76,8 +83,20 @@ function dress(scenario: string, prompt: string, temperature: number): Look {
   return { scenario, worn, score: scoreOutfit(worn), name: built.name, warnings: built.warnings };
 }
 
-const SCENARIOS: [string, string, number][] = [
+/** Scenario, what she typed, the temperature, and what the sky is doing. */
+const SCENARIOS: [string, string, number, Partial<WeatherSnapshot>?][] = [
   ['A normal Tuesday', 'Something for today', 18],
+  ['A funeral', "I'm going to a funeral", 12],
+  ['A job interview', 'I have a job interview', 15],
+  ['The school run', "I'm doing the school run", 11],
+  ['Running errands', 'Running errands', 14],
+  ['The pub', "I'm going to the pub", 13],
+  ['A barbecue', "I'm going to a barbecue", 24],
+  ['The theatre', "I'm going to the theatre", 12],
+  ['A festival', "I'm going to a festival", 17],
+  ['A graduation', "I'm going to a graduation", 19],
+  ['Pouring, commuting', "I'm going to work", 12, { code: 65, condition: 'Heavy rain', precipitationChance: 95 }],
+  ['Pouring, the school run', "I'm doing the school run", 9, { code: 63, condition: 'Rain', precipitationChance: 88 }],
   ['First day at a new office', "It's my first day at the new office", 16],
   ['Dinner out', 'Dinner out with friends', 14],
   ['A wedding', "I'm going to a wedding", 20],
@@ -89,8 +108,8 @@ const SCENARIOS: [string, string, number][] = [
   ['Travelling', "I'm travelling today", 15],
 ];
 
-const looks = SCENARIOS.map(([scenario, prompt, temperature]) =>
-  dress(scenario, prompt, temperature),
+const looks = SCENARIOS.map(([scenario, prompt, temperature, sky]) =>
+  dress(scenario, prompt, temperature, sky),
 );
 
 describe('what it actually puts on her', () => {
@@ -219,10 +238,12 @@ describe('what it actually puts on her', () => {
     // Wear count was a straight penalty, so a purple satin shirt bought once
     // and regretted outranked a favourite tee worn forty-two times — and turned
     // up in seven of these ten outfits.
-    const appearances = looks.filter((look) =>
-      look.worn.some((item) => item.name === 'Purple satin shirt'),
-    ).length;
-    expect(appearances, 'the regretted shirt is everywhere').toBeLessThanOrEqual(2);
+    // As a share, not a count: the scenario list grows, and a fixed number
+    // quietly turns into a stricter test every time a day is added.
+    const share =
+      looks.filter((look) => look.worn.some((item) => item.name === 'Purple satin shirt'))
+        .length / looks.length;
+    expect(share, 'the regretted shirt is everywhere').toBeLessThanOrEqual(0.2);
 
     const favourites = looks.filter((look) =>
       look.worn.some((item) => item.favorite),

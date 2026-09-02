@@ -79,8 +79,10 @@ describe('readIntent', () => {
   });
 
   it('does not find a word inside another word', () => {
-    // "errands" contains "run"; it is a day at home, not a workout.
-    expect(readIntent('doing some errands')?.occasion).toBe('a day at home');
+    // "errands" contains "run"; it is not a workout. It is also not a day at
+    // home — going to the shops is going out, and it is labelled as itself now.
+    expect(readIntent('doing some errands')?.occasion).toBe('errands');
+    expect(readIntent('doing some errands')?.formality).toBe('very-casual');
   });
 
   it('says nothing rather than guessing', () => {

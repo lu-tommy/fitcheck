@@ -794,6 +794,27 @@ where there is a hole. What it found:
   announced "a run look". One rule can serve several days that dress alike; the
   label still has to be the word that was used.
 
+### Two more the days themselves exposed
+
+Running the twenty-two scenarios again found two things the coverage sweep could
+not, because both are about strength rather than presence:
+
+- **The occasion could overrule the weather.** What a day asks for was worth
+  +60 — more than the seasonality penalty, more than the waterproof bonus, more
+  than the two combined can answer — so *"going to work"* put a wool blazer on
+  somebody in a downpour, walking straight past a raincoat, because the work
+  rule lists a blazer among the things that suit an office. The occasion says
+  what *kind* of garment suits the day; the weather says whether that garment is
+  wearable today, and it has to be able to say so. The wrong coat is marked down
+  now as well as the right one marked up, on every coat equally, so a wardrobe
+  with nothing waterproof still gets one.
+- **A colour request matched a spelling, not a colour.** A funeral asks for
+  black, and charcoal, navy and a dark grey coat contain none of those six
+  letters — so the app agreed the day wanted black and then went looking for the
+  word, and put an oatmeal jumper over a black dress. Colours are compared as
+  colours now: asking for black is asking for *dark and neutral*, which navy and
+  charcoal answer and burgundy does not, and asking for blue finds denim.
+
 ## Testing
 
 `npm test` covers the domain layer — the outfit engine's slot rules and

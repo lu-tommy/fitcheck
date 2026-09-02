@@ -100,6 +100,13 @@ export const REAL_WARDROBE: ClothingItem[] = [
   piece({ name: 'Tortoiseshell sunglasses', category: 'sunglasses', primaryColor: 'brown', primaryColorHex: '#6E4C34', wearCount: 15, seasons: ['spring', 'summer'] }),
   piece({ name: 'Charcoal beanie', category: 'beanie', primaryColor: 'charcoal', primaryColorHex: '#3A3A3F', material: 'Wool', wearCount: 8, seasons: ['winter'] }),
 
+  /* ------------------------------------------------------------ wet weather */
+  piece({ name: 'Navy raincoat', category: 'raincoat', primaryColor: 'navy', primaryColorHex: '#1F3557', material: 'Nylon', formality: 'casual', wearCount: 14, fit: 'regular', length: 'long', seasons: ['spring', 'fall', 'winter'], styles: ['outdoor', 'casual'] }),
+  piece({ name: 'Green rain boots', category: 'rain-boots', primaryColor: 'green', primaryColorHex: '#4B7A50', material: 'Nylon', formality: 'very-casual', wearCount: 6, seasons: ['fall', 'winter', 'spring'], styles: ['outdoor'] }),
+  piece({ name: 'Black umbrella', category: 'umbrella', primaryColor: 'black', material: 'Nylon', wearCount: 19 }),
+  piece({ name: 'Black leggings', category: 'leggings', primaryColor: 'black', material: 'Nylon', formality: 'very-casual', wearCount: 31, fit: 'fitted', rise: 'high', seasons: ['spring', 'fall', 'winter'], styles: ['athletic'] }),
+  piece({ name: 'Black ballet flats', category: 'flats', primaryColor: 'black', material: 'Leather', formality: 'business-casual', wearCount: 13, seasons: ['spring', 'summer', 'fall'], styles: ['minimalist'] }),
+
   /* ------- the guest-room end of the rail: bought, barely worn, unfilled --- */
   piece({ name: 'Purple satin shirt', category: 'shirt', primaryColor: 'purple', primaryColorHex: '#6E5495', material: 'Polyester', formality: 'smart-casual', wearCount: 1 }),
   piece({ name: 'Red plaid overshirt', category: 'shirt', primaryColor: 'red', primaryColorHex: '#B23A31', pattern: 'plaid', material: 'Cotton', formality: 'casual', wearCount: 2, seasons: ['fall', 'winter'] }),
