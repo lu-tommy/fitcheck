@@ -366,7 +366,14 @@ moment somebody wants to send it — and the picture now carries the Fit Score
 badge and the verdict, because a flat lay is a photograph of some clothes and a
 flat lay with a number on it is an argument.
 
-**Which one?** — the generator can build a second option, excluding everything
+**Which one?** is also a verb. Two saved outfits can be picked off the Outfits
+screen and sent as one picture — the case somebody is actually in, torn between
+two things already hanging up, rather than between one just invented. While
+picking, the rows stop being links: navigating away mid-choice loses the first
+pick, and a row that sometimes opens an outfit and sometimes selects it is the
+kind of ambiguity people tap twice to test.
+
+In the generator, **Which one?** — it can build a second option, excluding everything
 in the first so the two are genuinely different, and share both as a single
 picture. This is the one feature in the roadmap that the commercial apps
 structurally cannot copy: their user is one person alone with an app.
