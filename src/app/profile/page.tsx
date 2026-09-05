@@ -22,7 +22,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { ReminderSetting } from '@/components/ReminderSetting';
 import { SyncStatus } from '@/components/SyncStatus';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { SectionHeader } from '@/components/ui/Feedback';
 import { TasteCard } from '@/components/TasteCard';
@@ -124,7 +124,7 @@ export default function ProfilePage() {
                 </Button>
               </div>
             </div>
-          ) : (
+          ) : authStatus === 'loading' ? (
             <div className="card flex items-start gap-3 p-4">
               <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--surface-alt)] text-[var(--text-muted)]">
                 <CloudOff size={17} />
@@ -136,6 +136,30 @@ export default function ProfilePage() {
                   device is untouched.
                 </span>
               </span>
+            </div>
+          ) : (
+            /*
+             * Signed out is a real state now: the app is browsable without an
+             * account, so this has to offer a way in rather than assume the
+             * connection dropped. Nothing here is broken — the wardrobe on this
+             * device works exactly the same, it just is not copied anywhere.
+             */
+            <div className="card flex flex-col gap-3 p-4">
+              <div className="flex items-start gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--surface-alt)] text-[var(--text-muted)]">
+                  <CloudOff size={17} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[0.9375rem] font-medium">Not signed in</span>
+                  <span className="mt-0.5 block text-[0.8125rem] leading-relaxed text-[var(--text-muted)]">
+                    Everything works, and everything stays on this device. Sign in to keep a copy
+                    on your own server, so a lost phone is not a fresh start.
+                  </span>
+                </span>
+              </div>
+              <ButtonLink href="/account" variant="secondary" size="sm">
+                Sign in
+              </ButtonLink>
             </div>
           )}
         </section>
