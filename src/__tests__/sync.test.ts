@@ -377,8 +377,8 @@ describe('when things go wrong', () => {
 
   /*
    * The bug this covers shipped and was caught in a browser: the client cached
-   * "you are Tommy" while the session cookie had become Lia's, so the guard
-   * compared Tommy to Tommy, saw no mismatch, and pushed one person's wardrobe
+   * the previous account identity while the cookie had become the second one's, so the guard
+   * compared the stale value with itself, saw no mismatch, and pushed one person's wardrobe
    * into the other's account. Identity now comes from the server.
    */
   it('stops rather than sync when the client and the server disagree', async () => {

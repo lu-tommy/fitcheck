@@ -74,7 +74,7 @@ while [ "$i" -lt 60 ]; do
     echo "Up. It answers on http://$(hostname -i 2>/dev/null | awk '{print $1}'):3210"
     echo
     echo "Now add a Proxy Host in Nginx Proxy Manager:"
-    echo "  Domain            fitcheck.tommyluhome.duckdns.org"
+    echo "  Domain            fitcheck.example.com"
     echo "  Scheme            http"
     echo "  Forward hostname  this NAS's LAN address"
     echo "  Forward port      3210"

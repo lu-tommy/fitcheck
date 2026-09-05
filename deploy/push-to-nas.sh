@@ -17,7 +17,8 @@
 #
 # Usage: deploy/push-to-nas.sh [user@host] [remote-dir]
 set -e
-HOST="${1:-Tommy@192.168.50.2}"
+# Pass your own; the default is a placeholder, not a real host.
+HOST="${1:-user@nas.local}"
 DIR="${2:-/volume2/docker/fitcheck}"
 TMP="$(mktemp -t fitcheck-src).tgz"
 

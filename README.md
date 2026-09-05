@@ -13,7 +13,7 @@ No API keys, and nothing to pay for. One optional model, downloaded on request.
 ```sh
 npm install
 npm run dev        # http://localhost:3000
-npm test           # 90 tests over the domain logic
+npm test           # 530 tests over the domain logic and sync engine
 npm run typecheck
 ```
 
@@ -75,8 +75,8 @@ which would otherwise strand an offline app on the sign-in screen.
 ```sh
 cp .env.example .env.local
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"   # FITCHECK_SECRET
-npm run add-user -- lia      # prints a name:salt:hash line for FITCHECK_USERS
-npm run add-user -- tommy    # entries are separated by ;
+npm run add-user -- sam      # prints a name:salt:hash line for FITCHECK_USERS
+npm run add-user -- alex     # entries are separated by ;
 ```
 
 Passwords are never stored — only a scrypt hash and its salt — so `.env.local`
@@ -98,17 +98,17 @@ keeps the host's ownership, so a `data` directory created by root is read-only
 to the app and **every sync fails with a 500 while the app otherwise looks
 perfectly healthy**.
 
-The container listens on `127.0.0.1:3210` only, so nginx is the only way in.
-`deploy/nginx-fitcheck.conf` is a ready site config for
-`fitcheck.tommyluhome.duckdns.org` — it terminates TLS, forwards
-`X-Forwarded-For` (the login rate limiter needs it), allows 32 MB uploads for
-photo imports, and asks search engines to stay away.
+The container listens on `127.0.0.1:3210` only, so a reverse proxy is the only
+way in. Whatever you put in front of it needs to terminate TLS, forward
+`X-Forwarded-For` (the login rate limiter needs it), allow uploads of at least
+32 MB for photo imports, and — unless you want the app indexed — ask search
+engines to stay away.
 
 Everything lives in `./data`, one folder per person:
 
 ```
-data/users/lia/wardrobe.json     her clothes, outfits, plans — readable JSON
-data/users/lia/photos/           one file per photo
+data/users/sam/wardrobe.json     that person's clothes, outfits, plans — readable JSON
+data/users/sam/photos/           one file per photo
 ```
 
 Back that folder up and nothing else matters. Every write goes to a temporary
@@ -146,8 +146,8 @@ deleted, and there are two buttons — keep only mine, or merge it in.
 Two bugs in that path were found by driving the real app, and both are now
 covered by tests:
 
-- The client cached "you are Tommy" in localStorage while the session cookie had
-  become Lia's, so the guard compared Tommy to Tommy, saw no mismatch, and
+- The client cached the previous account identity in localStorage while the cookie had
+  become the second account's, so the guard compared the stale value with
   uploaded one person's wardrobe into the other's account. **Identity now comes
   from the server**, and the engine refuses to run if the two disagree.
 - The guard was a one-shot: the first pull-only run recorded the new account id,

@@ -2,7 +2,7 @@
 /**
  * Print an FITCHECK_USERS entry for one person.
  *
- *   npm run add-user -- lia
+ *   npm run add-user -- sam
  *
  * The password is asked for without echoing and is never written anywhere: only
  * a scrypt hash and its salt end up in the environment file, so that file does
