@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { OutfitPill } from '@/components/outfit/OutfitCard';
 import { MemoryCard } from '@/components/MemoryCard';
@@ -47,6 +47,7 @@ import { useTaste } from '@/store/taste';
 import { usePlanner } from '@/store/planner';
 import { usePreferences } from '@/store/preferences';
 import { toast } from '@/store/toast';
+import { useAuth } from '@/store/auth';
 import { useWeather } from '@/store/weather';
 import type { ClothingItem, Outfit } from '@/types';
 
@@ -62,6 +63,7 @@ export default function HomePage() {
   const signals = useTaste((state) => state.signals);
   const recordSignal = useTaste((state) => state.record);
   const recordWorn = useTaste((state) => state.recordWorn);
+  const authStatus = useAuth((state) => state.status);
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [sharing, setSharing] = useState(false);
   /*
@@ -288,6 +290,33 @@ export default function HomePage() {
 
   const favourites = outfits.filter((outfit) => outfit.favorite).slice(0, 8);
   const dirtyCount = items.filter((item) => item.laundry !== 'clean').length;
+
+  /*
+   * Arriving at /?demo=1 fills an empty wardrobe so the first screen shows the
+   * app doing something, rather than an empty-state card.
+   *
+   * Three guards, and all three are load-bearing. Demo pieces are ordinary
+   * items with no marker distinguishing them, so if they were ever added to a
+   * real account they would sync into it and there would be no way to tell them
+   * apart afterwards. So: only on the explicit query parameter, only while
+   * signed out, and only when the wardrobe is empty. A family member signing in
+   * on a new device never passes through this path.
+   */
+  // Read from location rather than useSearchParams: this route is prerendered
+  // static (see the note above), and useSearchParams would force it dynamic
+  // or demand a Suspense boundary for no benefit.
+  const [demoRequested, setDemoRequested] = useState(false);
+  useEffect(() => {
+    setDemoRequested(new URLSearchParams(window.location.search).get('demo') === '1');
+  }, []);
+  const autoDemoFired = useRef(false);
+  useEffect(() => {
+    if (!demoRequested || autoDemoFired.current) return;
+    if (!hydrated || authStatus === 'loading') return;
+    if (authStatus === 'signed-in' || items.length > 0) return;
+    autoDemoFired.current = true;
+    void loadDemo();
+  }, [demoRequested, hydrated, authStatus, items.length]);
 
   async function loadDemo() {
     setLoadingDemo(true);
